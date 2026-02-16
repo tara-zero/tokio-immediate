@@ -114,7 +114,7 @@ where
 #[derive(Clone)]
 pub struct AsyncGlueViewport {
     wake_up_requested: Arc<AtomicBool>,
-    wake_up: Option<Arc<dyn Fn() + Send + Sync>>,
+    wake_up: Arc<AsyncGlueWakeUpSlot>,
 }
 
 /// A thread-safe collection of [`AsyncGlueWaker`]s that can all be woken up
@@ -141,8 +141,11 @@ struct AsyncGlueWakerListInner {
 #[derive(Clone)]
 pub struct AsyncGlueWaker {
     wake_up_requested: Arc<AtomicBool>,
-    wake_up: Weak<dyn Fn() + Send + Sync>,
+    wake_up: Weak<AsyncGlueWakeUpSlot>,
 }
+
+type AsyncGlueWakeUpSlot = RwLock<Option<AsyncGlueWakeUpCallback>>;
+pub type AsyncGlueWakeUpCallback = Arc<dyn Fn() + Send + Sync>;
 
 /// RAII guard that wakes up on drop.
 pub struct AsyncGlueWakeUpGuard<'a, W>
@@ -164,10 +167,7 @@ pub trait AsyncGlueWakeUp {
     }
 
     /// Requests a wake-up.
-    ///
-    /// Returns `true` when the wake-up request was accepted, and `false`
-    /// when it could not be delivered.
-    fn wake_up(&self) -> bool;
+    fn wake_up(&self);
 }
 
 /// Abstraction over how [`AsyncGlue`] accesses a Tokio runtime.
@@ -378,17 +378,30 @@ where
     }
 }
 
-impl Drop for AsyncGlueViewport {
-    fn drop(&mut self) {
-        let wake_up = unsafe {
-            // SAFETY: `self.wake_up` is set to `Some(...)` in `new()` and replaced with `None` in `drop()`.
-            self.wake_up.take().unwrap_unchecked()
-        };
-        let weak = Arc::downgrade(&wake_up);
-        drop(wake_up);
-        if weak.strong_count() == 0 {
-            // Make sure that some other thread/task will notice this on `AsyncGlueWakeUp::wake_up()`.
-            self.wake_up_requested.store(false, Ordering::Relaxed);
+impl Default for AsyncGlueViewport {
+    fn default() -> Self {
+        Self {
+            wake_up_requested: Arc::new(AtomicBool::new(false)),
+            wake_up: Arc::new(RwLock::new(None)),
+        }
+    }
+}
+
+impl AsyncGlueWakeUp for AsyncGlueViewport {
+    fn wake_up(&self) {
+        if self
+            .wake_up_requested
+            .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
+            .is_ok()
+        {
+            let wake_up = self
+                .wake_up
+                .read()
+                .expect("Failed to read-lock AsyncGlueViewport callback: poisoned by panic")
+                .clone();
+            if let Some(wake_up) = wake_up {
+                (wake_up)();
+            }
         }
     }
 }
@@ -400,14 +413,30 @@ impl AsyncGlueViewport {
     /// viewport finishes or a synchronisation primitive is updated. It
     /// **must not block**.
     #[must_use]
-    pub fn new<F>(wake_up: F) -> Self
-    where
-        F: 'static + Fn() + Send + Sync,
-    {
-        Self {
-            wake_up_requested: Arc::new(AtomicBool::new(false)),
-            wake_up: Some(Arc::new(wake_up)),
-        }
+    pub fn new_with_wake_up(wake_up: AsyncGlueWakeUpCallback) -> Self {
+        let viewport = Self::default();
+        let _ = viewport.replace_wake_up(Some(wake_up));
+        viewport
+    }
+
+    /// Replaces the viewport wake-up callback, returning the previous one.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the callback lock is poisoned by another thread panicking
+    /// while holding the write lock.
+    #[must_use]
+    pub fn replace_wake_up(
+        &self,
+        wake_up: Option<AsyncGlueWakeUpCallback>,
+    ) -> Option<AsyncGlueWakeUpCallback> {
+        replace(
+            &mut *self
+                .wake_up
+                .write()
+                .expect("Failed to write-lock AsyncGlueViewport callback: poisoned by panic"),
+            wake_up,
+        )
     }
 
     /// Creates an [`AsyncGlue`] wired to this viewport, using `A::default()`
@@ -436,14 +465,9 @@ impl AsyncGlueViewport {
     /// viewport.
     #[must_use]
     pub fn new_waker(&self) -> AsyncGlueWaker {
-        let wake_up = unsafe {
-            // SAFETY: `self.wake_up` is set to `Some(...)` in `new()` and replaced with `None` in `drop()`.
-            self.wake_up.as_ref().unwrap_unchecked()
-        };
-
         AsyncGlueWaker {
             wake_up_requested: self.wake_up_requested.clone(),
-            wake_up: Arc::downgrade(wake_up),
+            wake_up: Arc::downgrade(&self.wake_up),
         }
     }
 
@@ -471,16 +495,10 @@ impl Default for AsyncGlueWakerList {
 }
 
 impl AsyncGlueWakeUp for AsyncGlueWakerList {
-    /// Wakes up every registered waker.
-    ///
-    /// Returns `true` if all wakers were successfully woken (or the list is
-    /// empty). Returns `false` if any waker's viewport has been dropped.
-    fn wake_up(&self) -> bool {
-        self.inner()
-            .wakers
-            .iter()
-            .filter_map(|waker| waker.as_ref().map(AsyncGlueWakeUp::wake_up))
-            .all(|was_woken| was_woken)
+    fn wake_up(&self) {
+        for waker in self.inner().wakers.iter().flatten() {
+            waker.wake_up();
+        }
     }
 }
 
@@ -551,26 +569,23 @@ impl AsyncGlueWakerList {
 }
 
 impl AsyncGlueWakeUp for AsyncGlueWaker {
-    /// Requests a repaint of the associated viewport.
-    ///
-    /// Returns `true` if the wake-up callback was invoked (or a request was
-    /// already pending). Returns `false` if the owning
-    /// [`AsyncGlueViewport`] has been dropped.
-    fn wake_up(&self) -> bool {
+    fn wake_up(&self) {
         if self
             .wake_up_requested
             .compare_exchange(false, true, Ordering::Relaxed, Ordering::Relaxed)
             .is_ok()
         {
             if let Some(wake_up) = self.wake_up.upgrade() {
-                (wake_up)();
-                true
+                let wake_up = wake_up
+                    .read()
+                    .expect("Failed to read-lock AsyncGlueWaker callback: poisoned by panic")
+                    .clone();
+                if let Some(wake_up) = wake_up {
+                    (wake_up)();
+                }
             } else {
                 self.wake_up_requested.store(false, Ordering::Relaxed);
-                false
             }
-        } else {
-            true
         }
     }
 }

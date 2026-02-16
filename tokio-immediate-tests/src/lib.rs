@@ -19,7 +19,7 @@ mod tests {
 
     #[test]
     fn poll_returns_false_for_stopped_state() {
-        let viewport = AsyncGlueViewport::new(|| {});
+        let viewport = AsyncGlueViewport::default();
         let mut glue: AsyncGlue<u32> = viewport.new_glue();
 
         assert!(glue.is_stopped());
@@ -30,11 +30,11 @@ mod tests {
     fn start_and_poll_completes_task() {
         let runtime = Runtime::new().expect("runtime should initialize");
         let wake_count = Arc::new(AtomicUsize::new(0));
-        let viewport = AsyncGlueViewport::new({
+        let viewport = AsyncGlueViewport::new_with_wake_up({
             let wake_count = wake_count.clone();
-            move || {
+            Arc::new(move || {
                 wake_count.fetch_add(1, Ordering::Relaxed);
-            }
+            })
         });
         let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
 
@@ -61,11 +61,11 @@ mod tests {
     fn aborted_task_transitions_back_to_stopped() {
         let runtime = Runtime::new().expect("runtime should initialize");
         let wake_count = Arc::new(AtomicUsize::new(0));
-        let viewport = AsyncGlueViewport::new({
+        let viewport = AsyncGlueViewport::new_with_wake_up({
             let wake_count = wake_count.clone();
-            move || {
+            Arc::new(move || {
                 wake_count.fetch_add(1, Ordering::Relaxed);
-            }
+            })
         });
         let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
         let _ = glue.start(async {
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn second_start_returns_previous_running_state() {
         let runtime = Runtime::new().expect("runtime should initialize");
-        let viewport = AsyncGlueViewport::new(|| {});
+        let viewport = AsyncGlueViewport::default();
         let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
 
         let _ = glue.start(async {
@@ -122,35 +122,34 @@ mod tests {
     #[test]
     fn waker_requires_woke_up_reset_before_second_callback() {
         let wake_count = Arc::new(AtomicUsize::new(0));
-        let viewport = AsyncGlueViewport::new({
+        let viewport = AsyncGlueViewport::new_with_wake_up({
             let wake_count = wake_count.clone();
-            move || {
+            Arc::new(move || {
                 wake_count.fetch_add(1, Ordering::Relaxed);
-            }
+            })
         });
         let waker = viewport.new_waker();
 
-        assert!(waker.wake_up());
+        waker.wake_up();
         assert_eq!(wake_count.load(Ordering::Relaxed), 1);
 
-        assert!(waker.wake_up());
+        waker.wake_up();
         assert_eq!(wake_count.load(Ordering::Relaxed), 1);
 
         viewport.woke_up();
-        assert!(waker.wake_up());
+        waker.wake_up();
         assert_eq!(wake_count.load(Ordering::Relaxed), 2);
     }
 
     #[test]
     fn dropped_viewport_makes_waker_inactive() {
-        let viewport = AsyncGlueViewport::new(|| {});
+        let viewport = AsyncGlueViewport::default();
         let waker = viewport.new_waker();
 
         assert!(waker.is_alive());
         drop(viewport);
 
         assert!(!waker.is_alive());
-        assert!(!waker.wake_up());
     }
 
     #[test]
@@ -158,24 +157,24 @@ mod tests {
         let wake_count_one = Arc::new(AtomicUsize::new(0));
         let wake_count_two = Arc::new(AtomicUsize::new(0));
 
-        let viewport_one = AsyncGlueViewport::new({
+        let viewport_one = AsyncGlueViewport::new_with_wake_up({
             let wake_count_one = wake_count_one.clone();
-            move || {
+            Arc::new(move || {
                 wake_count_one.fetch_add(1, Ordering::Relaxed);
-            }
+            })
         });
-        let viewport_two = AsyncGlueViewport::new({
+        let viewport_two = AsyncGlueViewport::new_with_wake_up({
             let wake_count_two = wake_count_two.clone();
-            move || {
+            Arc::new(move || {
                 wake_count_two.fetch_add(1, Ordering::Relaxed);
-            }
+            })
         });
 
         let waker_list = AsyncGlueWakerList::with_capacity(2);
         let index_one = waker_list.add_waker(viewport_one.new_waker());
         let _index_two = waker_list.add_waker(viewport_two.new_waker());
 
-        assert!(waker_list.wake_up());
+        waker_list.wake_up();
         assert_eq!(wake_count_one.load(Ordering::Relaxed), 1);
         assert_eq!(wake_count_two.load(Ordering::Relaxed), 1);
 
@@ -185,7 +184,7 @@ mod tests {
         unsafe {
             waker_list.remove_waker(index_one);
         }
-        assert!(waker_list.wake_up());
+        waker_list.wake_up();
         assert_eq!(wake_count_one.load(Ordering::Relaxed), 1);
         assert_eq!(wake_count_two.load(Ordering::Relaxed), 2);
     }
@@ -193,11 +192,11 @@ mod tests {
     #[test]
     fn wake_up_guard_triggers_on_drop() {
         let wake_count = Arc::new(AtomicUsize::new(0));
-        let viewport = AsyncGlueViewport::new({
+        let viewport = AsyncGlueViewport::new_with_wake_up({
             let wake_count = wake_count.clone();
-            move || {
+            Arc::new(move || {
                 wake_count.fetch_add(1, Ordering::Relaxed);
-            }
+            })
         });
         let waker = viewport.new_waker();
 
@@ -206,6 +205,78 @@ mod tests {
             assert_eq!(wake_count.load(Ordering::Relaxed), 0);
         }
 
+        assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn viewport_implements_wake_up_trait() {
+        let wake_count = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let wake_count = wake_count.clone();
+            Arc::new(move || {
+                wake_count.fetch_add(1, Ordering::Relaxed);
+            })
+        });
+
+        viewport.wake_up();
+        assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+
+        viewport.wake_up();
+        assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+
+        viewport.woke_up();
+        viewport.wake_up();
+        assert_eq!(wake_count.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn viewport_can_replace_wake_up_callback() {
+        let wake_count_one = Arc::new(AtomicUsize::new(0));
+        let wake_count_two = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let wake_count_one = wake_count_one.clone();
+            Arc::new(move || {
+                wake_count_one.fetch_add(1, Ordering::Relaxed);
+            })
+        });
+        let waker = viewport.new_waker();
+
+        waker.wake_up();
+        assert_eq!(wake_count_one.load(Ordering::Relaxed), 1);
+        assert_eq!(wake_count_two.load(Ordering::Relaxed), 0);
+
+        let _previous = viewport.replace_wake_up(Some(Arc::new({
+            let wake_count_two = wake_count_two.clone();
+            move || {
+                wake_count_two.fetch_add(1, Ordering::Relaxed);
+            }
+        })));
+        viewport.woke_up();
+
+        waker.wake_up();
+        assert_eq!(wake_count_one.load(Ordering::Relaxed), 1);
+        assert_eq!(wake_count_two.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn cleared_callback_keeps_waker_alive() {
+        let wake_count = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let wake_count = wake_count.clone();
+            Arc::new(move || {
+                wake_count.fetch_add(1, Ordering::Relaxed);
+            })
+        });
+        let waker = viewport.new_waker();
+
+        waker.wake_up();
+        assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+
+        let _previous = viewport.replace_wake_up(None);
+        viewport.woke_up();
+
+        waker.wake_up();
+        assert!(waker.is_alive());
         assert_eq!(wake_count.load(Ordering::Relaxed), 1);
     }
 }

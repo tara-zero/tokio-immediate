@@ -36,6 +36,11 @@ run-egui:
 run-egui-minimal:
     cargo run --release --package "tokio-immediate-example-egui-minimal"
 
+[doc("Run minimal imgui example")]
+[group("Examples")]
+run-imgui-minimal:
+    cargo run --release --package "tokio-immediate-example-imgui-minimal"
+
 [doc("Run `cargo clean`")]
 [group("Development")]
 clean:
@@ -71,6 +76,7 @@ clippy:
     done
     cargo clippy --package "tokio-immediate-example-egui" --all-targets --all-features -- --deny warnings
     cargo clippy --package "tokio-immediate-example-egui-minimal" --all-targets --all-features -- --deny warnings
+    cargo clippy --package "tokio-immediate-example-imgui-minimal" --all-targets --all-features -- --deny warnings
 
 [doc("Run `cargo build`")]
 [group("Development")]
@@ -78,11 +84,13 @@ build:
     # Features does not play well with `--workspace` so we build each crate separately.
     cargo build --package "tokio-immediate-example-egui" --bins
     cargo build --package "tokio-immediate-example-egui-minimal" --bins
+    cargo build --package "tokio-immediate-example-imgui-minimal" --bins
     @echo
     @echo "Examples (debug):"
     @ls -lh \
             target/debug/tokio-immediate-example-egui{{ exe_ext }} \
-            target/debug/tokio-immediate-example-egui-minimal{{ exe_ext }}
+            target/debug/tokio-immediate-example-egui-minimal{{ exe_ext }} \
+            target/debug/tokio-immediate-example-imgui-minimal{{ exe_ext }}
 
 [doc("Run `cargo build --release`")]
 [group("Development")]
@@ -90,11 +98,13 @@ build-release:
     # Features does not play well with `--workspace` so we build each crate separately.
     cargo build --release --package "tokio-immediate-example-egui" --bins
     cargo build --release --package "tokio-immediate-example-egui-minimal" --bins
+    cargo build --release --package "tokio-immediate-example-imgui-minimal" --bins
     @echo
     @echo "Examples (release):"
     @ls -lh \
             target/release/tokio-immediate-example-egui{{ exe_ext }} \
-            target/release/tokio-immediate-example-egui-minimal{{ exe_ext }}
+            target/release/tokio-immediate-example-egui-minimal{{ exe_ext }} \
+            target/release/tokio-immediate-example-imgui-minimal{{ exe_ext }}
 
 [doc("Run `cargo test`")]
 [group("Development")]

@@ -9,11 +9,11 @@ use ::tokio_immediate::sync::broadcast;
 #[tokio::test]
 async fn channel_with_waker_wakes_on_im_send() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new({
+    let viewport = AsyncGlueViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
-        move || {
+        Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
-        }
+        })
     });
 
     let (sender, mut receiver) = broadcast::channel_with_waker(4, viewport.new_waker());
@@ -34,11 +34,11 @@ async fn channel_with_waker_wakes_on_im_send() {
 #[test]
 fn failed_send_does_not_wake() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new({
+    let viewport = AsyncGlueViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
-        move || {
+        Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
-        }
+        })
     });
 
     let (sender, receiver) = broadcast::channel_with_waker::<u32>(4, viewport.new_waker());
@@ -58,11 +58,11 @@ fn failed_send_does_not_wake() {
 #[tokio::test]
 async fn resubscribe_with_waker_wakes_after_plain_channel_creation() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new({
+    let viewport = AsyncGlueViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
-        move || {
+        Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
-        }
+        })
     });
 
     let (sender, mut receiver) = broadcast::channel::<u32>(4);
@@ -91,11 +91,11 @@ async fn resubscribe_with_waker_wakes_after_plain_channel_creation() {
 #[tokio::test]
 async fn resubscribe_without_waker_does_not_wake() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new({
+    let viewport = AsyncGlueViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
-        move || {
+        Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
-        }
+        })
     });
 
     let (sender, receiver) = broadcast::channel_with_waker::<u32>(4, viewport.new_waker());
@@ -119,11 +119,11 @@ async fn resubscribe_without_waker_does_not_wake() {
 #[test]
 fn resubscribe_with_waker_unregisters_on_drop() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new({
+    let viewport = AsyncGlueViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
-        move || {
+        Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
-        }
+        })
     });
 
     let (sender, receiver) = broadcast::channel::<u32>(4);
