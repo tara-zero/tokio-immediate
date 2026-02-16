@@ -41,7 +41,7 @@ pub use ::tokio_immediate::trigger;
 /// Re-export other `tokio-immediate` stuff.
 pub use ::tokio_immediate::{
     AsyncGlue, AsyncGlueCurrentRuntime, AsyncGlueRuntime, AsyncGlueState, AsyncGlueViewport,
-    AsyncGlueWakeUp, AsyncGlueWaker, AsyncGlueWakerList,
+    AsyncGlueWakeUp, AsyncGlueWakeUpGuard, AsyncGlueWaker, AsyncGlueWakerList,
 };
 
 /// Manages [`AsyncGlueViewport`]s for all egui viewports via a [`Plugin`].
