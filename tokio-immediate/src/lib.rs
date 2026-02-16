@@ -146,8 +146,25 @@ pub struct AsyncGlueWaker {
     wake_up: Weak<dyn Fn() + Send + Sync>,
 }
 
+/// RAII guard that wakes up on drop.
+pub struct AsyncGlueWakeUpGuard<'a, W>
+where
+    W: ?Sized + AsyncGlueWakeUp,
+{
+    waker: &'a W,
+}
+
 /// Common interface for types that can request a viewport wake-up.
 pub trait AsyncGlueWakeUp {
+    /// Creates a guard that calls [`AsyncGlueWakeUp::wake_up`] when dropped.
+    #[must_use]
+    fn guard(&self) -> AsyncGlueWakeUpGuard<'_, Self>
+    where
+        Self: Sized,
+    {
+        AsyncGlueWakeUpGuard { waker: self }
+    }
+
     /// Requests a wake-up.
     ///
     /// Returns `true` when the wake-up request was accepted, and `false`
@@ -571,6 +588,37 @@ impl AsyncGlueWaker {
     #[must_use]
     pub fn is_same_viewport(&self, other: &Self) -> bool {
         self.wake_up_requested.as_ptr() == other.wake_up_requested.as_ptr()
+    }
+}
+
+impl<W> Deref for AsyncGlueWakeUpGuard<'_, W>
+where
+    W: ?Sized + AsyncGlueWakeUp,
+{
+    type Target = W;
+
+    fn deref(&self) -> &Self::Target {
+        self.waker
+    }
+}
+
+impl<W, T> AsRef<T> for AsyncGlueWakeUpGuard<'_, W>
+where
+    W: ?Sized + AsyncGlueWakeUp,
+    T: ?Sized,
+    <Self as Deref>::Target: AsRef<T>,
+{
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl<W> Drop for AsyncGlueWakeUpGuard<'_, W>
+where
+    W: ?Sized + AsyncGlueWakeUp,
+{
+    fn drop(&mut self) {
+        self.waker.wake_up();
     }
 }
 
