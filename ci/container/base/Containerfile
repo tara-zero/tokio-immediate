@@ -37,6 +37,7 @@ RUN dnf \
         "man-pages" \
         "bat" \
         "fzf" \
+        "ripgrep" \
         "mlocate" \
         "procps-ng" \
         "psmisc" \

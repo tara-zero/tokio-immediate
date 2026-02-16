@@ -1,5 +1,5 @@
 {
-  "image": "ghcr.io/tara-zero/tokio-immediate-ci-base:main-2026-02-13",
+  "image": "ghcr.io/tara-zero/tokio-immediate-ci-base:main-2026-02-16",
   "runArgs": ["--device", "/dev/fuse"],
   "remoteEnv": {
     "TERM": "${localEnv:TERM}",
