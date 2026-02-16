@@ -2,3 +2,4 @@
 
 mod mpsc;
 mod oneshot;
+mod watch;
