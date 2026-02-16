@@ -72,22 +72,20 @@ impl<T> Clone for Sender<T> {
     }
 }
 
-impl<T> AsRef<watch::Sender<T>> for Sender<T>
+impl<T, U> AsRef<U> for Sender<T>
 where
-    <Self as Deref>::Target: AsRef<watch::Sender<T>>,
+    <Self as Deref>::Target: AsRef<U>,
 {
-    fn as_ref(&self) -> &watch::Sender<T> {
-        #[allow(clippy::useless_asref)]
+    fn as_ref(&self) -> &U {
         self.deref().as_ref()
     }
 }
 
-impl<T> AsMut<watch::Sender<T>> for Sender<T>
+impl<T, U> AsMut<U> for Sender<T>
 where
-    <Self as Deref>::Target: AsMut<watch::Sender<T>>,
+    <Self as Deref>::Target: AsMut<U>,
 {
-    fn as_mut(&mut self) -> &mut watch::Sender<T> {
-        #[allow(clippy::useless_asref)]
+    fn as_mut(&mut self) -> &mut U {
         self.deref_mut().as_mut()
     }
 }
@@ -189,22 +187,20 @@ impl<T> Clone for Receiver<T> {
     }
 }
 
-impl<T> AsRef<watch::Receiver<T>> for Receiver<T>
+impl<T, U> AsRef<U> for Receiver<T>
 where
-    <Self as Deref>::Target: AsRef<watch::Receiver<T>>,
+    <Self as Deref>::Target: AsRef<U>,
 {
-    fn as_ref(&self) -> &watch::Receiver<T> {
-        #[allow(clippy::useless_asref)]
+    fn as_ref(&self) -> &U {
         self.deref().as_ref()
     }
 }
 
-impl<T> AsMut<watch::Receiver<T>> for Receiver<T>
+impl<T, U> AsMut<U> for Receiver<T>
 where
-    <Self as Deref>::Target: AsMut<watch::Receiver<T>>,
+    <Self as Deref>::Target: AsMut<U>,
 {
-    fn as_mut(&mut self) -> &mut watch::Receiver<T> {
-        #[allow(clippy::useless_asref)]
+    fn as_mut(&mut self) -> &mut U {
         self.deref_mut().as_mut()
     }
 }
