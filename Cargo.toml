@@ -67,6 +67,10 @@ default-features = false
 version = "0.7"
 default-features = false
 
+[workspace.dependencies.wgpu]
+version = "27"
+default-features = false
+
 [workspace.dependencies.winit]
 version = "0.30"
 default-features = false
