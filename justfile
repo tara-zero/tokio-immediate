@@ -1,4 +1,5 @@
 set shell := ["sh", "-ceu"]
+set positional-arguments := true
 
 exe_ext := if os() == "windows" { ".exe" } else { "" }
 
@@ -97,9 +98,9 @@ build-release:
 
 [doc("Run `cargo test`")]
 [group("Development")]
-test:
-    cargo test --package "tokio-immediate-tests" --all-targets --no-default-features
-    cargo test --package "tokio-immediate-tests" --all-targets --no-default-features --features "sync"
+test *args:
+    cargo test --package "tokio-immediate-tests" --all-targets --no-default-features "${@}"
+    cargo test --package "tokio-immediate-tests" --all-targets --no-default-features --features "sync" "${@}"
 
 [doc("Run `cargo fmt --check`")]
 [group("Continuous integration")]
