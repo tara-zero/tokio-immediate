@@ -18,11 +18,9 @@ impl WakerBinding {
         *self.waker_mut() = None;
     }
 
-    pub(super) fn wake_up(&self) -> bool {
+    pub(super) fn wake_up(&self) {
         if let Some(waker) = self.waker().as_ref() {
-            waker.wake_up()
-        } else {
-            true
+            waker.wake_up();
         }
     }
 

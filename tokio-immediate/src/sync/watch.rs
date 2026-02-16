@@ -169,8 +169,8 @@ impl<T> Sender<T> {
 }
 
 impl<T> AsyncGlueWakeUp for Sender<T> {
-    fn wake_up(&self) -> bool {
-        self.wakers.wake_up()
+    fn wake_up(&self) {
+        self.wakers.wake_up();
     }
 }
 

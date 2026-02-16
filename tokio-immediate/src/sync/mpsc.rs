@@ -218,8 +218,8 @@ impl<T> Sender<T> {
 }
 
 impl<T> AsyncGlueWakeUp for Sender<T> {
-    fn wake_up(&self) -> bool {
-        self.binding.wake_up()
+    fn wake_up(&self) {
+        self.binding.wake_up();
     }
 }
 
@@ -272,8 +272,8 @@ impl<T> UnboundedSender<T> {
 }
 
 impl<T> AsyncGlueWakeUp for UnboundedSender<T> {
-    fn wake_up(&self) -> bool {
-        self.binding.wake_up()
+    fn wake_up(&self) {
+        self.binding.wake_up();
     }
 }
 

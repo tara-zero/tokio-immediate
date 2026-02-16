@@ -41,7 +41,8 @@ pub use ::tokio_immediate::trigger;
 /// Re-export other `tokio-immediate` stuff.
 pub use ::tokio_immediate::{
     AsyncGlue, AsyncGlueCurrentRuntime, AsyncGlueRuntime, AsyncGlueState, AsyncGlueViewport,
-    AsyncGlueWakeUp, AsyncGlueWakeUpGuard, AsyncGlueWaker, AsyncGlueWakerList,
+    AsyncGlueWakeUp, AsyncGlueWakeUpCallback, AsyncGlueWakeUpGuard, AsyncGlueWaker,
+    AsyncGlueWakerList,
 };
 
 /// Manages [`AsyncGlueViewport`]s for all egui viewports via a [`Plugin`].
@@ -198,7 +199,9 @@ impl EguiAsync {
             viewport.new_waker()
         } else {
             let ctx = Self::context(&inner).clone();
-            let viewport = AsyncGlueViewport::new(move || ctx.request_repaint_of(viewport_id));
+            let viewport = AsyncGlueViewport::new_with_wake_up(Arc::new(move || {
+                ctx.request_repaint_of(viewport_id);
+            }));
             let waker = viewport.new_waker();
             inner.viewports.insert(viewport_id, viewport);
             waker

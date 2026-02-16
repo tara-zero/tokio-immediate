@@ -2,6 +2,7 @@
 members = [
     "example-egui",
     "example-egui-minimal",
+    "example-imgui-minimal",
     "tokio-immediate",
     "tokio-immediate-egui",
     "tokio-immediate-tests",
@@ -33,6 +34,14 @@ categories = [
 
 [workspace.dependencies.document-features]
 version = "0.2"
+default-features = false
+
+[workspace.dependencies.dear-app]
+version = "0.9"
+default-features = false
+
+[workspace.dependencies.dear-imgui-rs]
+version = "0.9"
 default-features = false
 
 [workspace.dependencies.eframe]
