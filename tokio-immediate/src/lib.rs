@@ -673,5 +673,3 @@ impl AsyncGlueRuntime for Handle {
         }
     }
 }
-
-// TODO: Tests.
