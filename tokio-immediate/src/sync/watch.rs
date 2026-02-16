@@ -4,6 +4,7 @@ use ::std::ops::{Deref, DerefMut};
 
 use ::tokio::sync::watch;
 
+use crate::sync::waker_registration::WakerRegistration;
 use crate::{AsyncGlueWakeUp, AsyncGlueWaker, AsyncGlueWakerList};
 
 /// Creates a new watch channel, returning a [`Sender`] and a [`Receiver`]
@@ -55,12 +56,7 @@ pub struct Sender<T> {
 /// to get a clone that wakes a specific viewport.
 pub struct Receiver<T> {
     receiver: watch::Receiver<T>,
-    inner: ReceiverInner,
-}
-
-struct ReceiverInner {
-    wakers: AsyncGlueWakerList,
-    waker_idx: usize,
+    inner: WakerRegistration,
 }
 
 impl<T> Clone for Sender<T> {
@@ -240,50 +236,14 @@ impl<T> Receiver<T> {
     ) -> Self {
         Self {
             receiver,
-            inner: ReceiverInner::new_with_waker(wakers, waker),
+            inner: WakerRegistration::new_with_waker(wakers, waker),
         }
     }
 
     fn new(receiver: watch::Receiver<T>, wakers: AsyncGlueWakerList) -> Self {
         Self {
             receiver,
-            inner: ReceiverInner::new(wakers),
-        }
-    }
-}
-
-impl Drop for ReceiverInner {
-    fn drop(&mut self) {
-        if self.waker_idx != usize::MAX {
-            unsafe {
-                // SAFETY: This is safe because `self.waker_idx` is a valid index returned
-                // by `AsyncGlueWakerList::add_waker()` and we are removing only once.
-                self.wakers.remove_waker(self.waker_idx);
-            }
-        }
-    }
-}
-
-impl Clone for ReceiverInner {
-    fn clone(&self) -> Self {
-        Self::new(self.wakers.clone())
-    }
-}
-
-impl ReceiverInner {
-    pub fn clone_with_waker(&self, waker: AsyncGlueWaker) -> Self {
-        Self::new_with_waker(self.wakers.clone(), waker)
-    }
-
-    fn new_with_waker(wakers: AsyncGlueWakerList, waker: AsyncGlueWaker) -> Self {
-        let waker_idx = wakers.add_waker(waker);
-        Self { wakers, waker_idx }
-    }
-
-    fn new(wakers: AsyncGlueWakerList) -> Self {
-        Self {
-            wakers,
-            waker_idx: usize::MAX,
+            inner: WakerRegistration::new(wakers),
         }
     }
 }
