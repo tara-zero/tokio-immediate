@@ -24,9 +24,15 @@ tokio-util = { workspace = true }
 workspace = true
 features = [
     "default_fonts",
-    "glow",
     "wayland",
     "x11",
+
+    # Multi-window demo has problems when running with glow on Linux/Wayland and one of the
+    # windows is hidden: other window may appear frozen and unresponsive. It looks like
+    # the wgpu backend does not have this problem. Probably related issues:
+    #   * https://github.com/emilk/egui/issues/5136
+    #   * https://github.com/emilk/egui/issues/5112
+    "wgpu",
 ]
 
 [dependencies.egui]
@@ -54,6 +60,18 @@ features = [
 workspace = true
 features = [
     "sync",
+]
+
+[dependencies.wgpu]
+workspace = true
+features = [
+    "dx12",
+    "metal",
+    "vulkan",
+    "gles",
+    "static-dxc",
+    "std",
+    "parking_lot",
 ]
 
 [dependencies.winit]
