@@ -19,8 +19,6 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::cargo)]
 
-// TODO: RAII wake_up guard.
-
 use ::std::hint::unreachable_unchecked;
 use ::std::mem::replace;
 use ::std::ops::{Deref, DerefMut};
