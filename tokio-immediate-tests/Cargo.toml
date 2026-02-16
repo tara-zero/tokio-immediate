@@ -24,6 +24,7 @@ tokio-immediate = { workspace = true }
 workspace = true
 features = [
     "rt",
+    "rt-multi-thread",
     "macros",
     "time",
 ]
