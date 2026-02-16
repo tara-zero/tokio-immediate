@@ -18,11 +18,16 @@ pub mod broadcast;
 /// viewport bound to the single [`Receiver`](mpsc::Receiver).
 pub mod mpsc;
 
+/// A viewport-aware wrapper around [`tokio::sync::oneshot`].
+///
+/// Works like the standard Tokio oneshot channel, but successful
+/// [`im_send()`](oneshot::Sender::im_send) calls additionally wake up the
+/// viewport bound to the single [`Receiver`](oneshot::Receiver).
+pub mod oneshot;
+
 /// A viewport-aware wrapper around [`tokio::sync::watch`].
 ///
 /// Works like the standard Tokio watch channel, but sending through the
 /// `im_send*` methods additionally wakes up every viewport that holds a
 /// registered [`Receiver`](watch::Receiver).
 pub mod watch;
-
-// TODO: oneshot
