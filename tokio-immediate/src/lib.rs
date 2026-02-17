@@ -302,9 +302,8 @@ where
         replace(
             &mut self.state,
             AsyncGlueState::Running(self.runtime.spawn(async move {
-                let value = future.await;
-                waker.wake_up();
-                value
+                let _wake_up_guard = waker.guard();
+                future.await
             })),
         )
     }
