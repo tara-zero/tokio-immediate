@@ -87,7 +87,7 @@ impl ::eframe::App for ExampleApp {
                     // Do not add any widgets when task was aborted or was never started.
                     AsyncGlueState::Stopped => {}
 
-                    // Add spinner and "Abort" button when task is running.
+                    // Add spinner and an "Abort" button when task is running.
                     AsyncGlueState::Running(task) => {
                         ui.spinner();
                         if ui.button("Abort").clicked() {
@@ -100,7 +100,7 @@ impl ::eframe::App for ExampleApp {
                         ui.label("Port is open!");
                     }
 
-                    // Task completed, with error.
+                    // Task completed, with an error.
                     AsyncGlueState::Completed(Err(error)) => {
                         ui.label("TCPing failed:");
                         ui.label(error);
