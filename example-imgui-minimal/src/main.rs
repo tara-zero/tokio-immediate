@@ -124,7 +124,7 @@ impl ExampleApp {
                     // Do not add any widgets when task was aborted or was never started.
                     AsyncGlueState::Stopped => {}
 
-                    // Add spinner and "Abort" button when task is running.
+                    // Add "Waiting..." text and an "Abort" button when task is running.
                     AsyncGlueState::Running(task) => {
                         ui.text("Waiting...");
                         if ui.button("Abort") {
@@ -137,7 +137,7 @@ impl ExampleApp {
                         ui.text("Port is open!");
                     }
 
-                    // Task completed, with error.
+                    // Task completed, with an error.
                     AsyncGlueState::Completed(Err(error)) => {
                         ui.text("TCPing failed:");
                         ui.text(error);
