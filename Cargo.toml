@@ -3,6 +3,7 @@ members = [
     "example-egui",
     "example-egui-minimal",
     "example-imgui-minimal",
+    "example-ratatui-minimal",
     "tokio-immediate",
     "tokio-immediate-egui",
     "tokio-immediate-tests",
@@ -33,16 +34,19 @@ categories = [
 ]
 
 [workspace.dependencies]
+crossterm = { version = "0.29", default-features = false }
 document-features = { version = "0.2", default-features = false }
 dear-app = { version = "0.9", default-features = false }
 dear-imgui-rs = { version = "0.9", default-features = false }
 eframe = { version = "0.33", default-features = false }
 egui = { version = "0.33", default-features = false }
 futures-util = { version = "0.3", default-features = false }
+ratatui = { version = "0.30", default-features = false }
 reqwest = { version = "0.13", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-immediate = { path = "tokio-immediate", default-features = false }
 tokio-immediate-egui = { path = "tokio-immediate-egui", default-features = false }
 tokio-util = { version = "0.7", default-features = false }
+tui-input = { version = "0.15", default-features = false }
 wgpu = { version = "27", default-features = false }
 winit = { version = "0.30", default-features = false }

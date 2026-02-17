@@ -1,0 +1,50 @@
+[package]
+name = "tokio-immediate-example-ratatui-minimal"
+description = "ratatui + tokio-immediate minimal usage example"
+
+version = { workspace = true }
+edition = { workspace = true }
+authors = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+readme = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+
+[features]
+# Dummy feature to make `rust-analyzer` happy.
+sync = []
+
+[dependencies]
+futures-util = { workspace = true }
+tokio-immediate = { workspace = true }
+
+[dependencies.crossterm]
+workspace = true
+features = [
+    "event-stream",
+    "events",
+    "windows",
+]
+
+[dependencies.ratatui]
+workspace = true
+features = [
+    "crossterm",
+]
+
+[dependencies.tokio]
+workspace = true
+features = [
+    "macros",
+    "net",
+    "rt-multi-thread",
+    "sync",
+    "time",
+]
+
+[dependencies.tui-input]
+workspace = true
+features = [
+    "crossterm",
+]

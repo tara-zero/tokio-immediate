@@ -41,6 +41,11 @@ run-egui-minimal:
 run-imgui-minimal:
     cargo run --release --package "tokio-immediate-example-imgui-minimal"
 
+[doc("Run minimal ratatui example")]
+[group("Examples")]
+run-ratatui-minimal:
+    cargo run --release --package "tokio-immediate-example-ratatui-minimal"
+
 [doc("Run `cargo clean`")]
 [group("Development")]
 clean:
@@ -77,6 +82,7 @@ clippy:
     cargo clippy --package "tokio-immediate-example-egui" --all-targets --all-features -- --deny warnings
     cargo clippy --package "tokio-immediate-example-egui-minimal" --all-targets --all-features -- --deny warnings
     cargo clippy --package "tokio-immediate-example-imgui-minimal" --all-targets --all-features -- --deny warnings
+    cargo clippy --package "tokio-immediate-example-ratatui-minimal" --all-targets --all-features -- --deny warnings
 
 [doc("Run `cargo build`")]
 [group("Development")]
@@ -85,12 +91,14 @@ build:
     cargo build --package "tokio-immediate-example-egui" --bins
     cargo build --package "tokio-immediate-example-egui-minimal" --bins
     cargo build --package "tokio-immediate-example-imgui-minimal" --bins
+    cargo build --package "tokio-immediate-example-ratatui-minimal" --bins
     @echo
     @echo "Examples (debug):"
     @ls -lh \
             target/debug/tokio-immediate-example-egui{{ exe_ext }} \
             target/debug/tokio-immediate-example-egui-minimal{{ exe_ext }} \
-            target/debug/tokio-immediate-example-imgui-minimal{{ exe_ext }}
+            target/debug/tokio-immediate-example-imgui-minimal{{ exe_ext }} \
+            target/debug/tokio-immediate-example-ratatui-minimal{{ exe_ext }}
 
 [doc("Run `cargo build --release`")]
 [group("Development")]
@@ -99,12 +107,14 @@ build-release:
     cargo build --release --package "tokio-immediate-example-egui" --bins
     cargo build --release --package "tokio-immediate-example-egui-minimal" --bins
     cargo build --release --package "tokio-immediate-example-imgui-minimal" --bins
+    cargo build --release --package "tokio-immediate-example-ratatui-minimal" --bins
     @echo
     @echo "Examples (release):"
     @ls -lh \
             target/release/tokio-immediate-example-egui{{ exe_ext }} \
             target/release/tokio-immediate-example-egui-minimal{{ exe_ext }} \
-            target/release/tokio-immediate-example-imgui-minimal{{ exe_ext }}
+            target/release/tokio-immediate-example-imgui-minimal{{ exe_ext }} \
+            target/release/tokio-immediate-example-ratatui-minimal{{ exe_ext }}
 
 [doc("Run `cargo test`")]
 [group("Development")]
