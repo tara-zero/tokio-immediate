@@ -1,6 +1,7 @@
 [package]
 name = "tokio-immediate-example-egui"
 description = "egui + tokio-immediate usage example"
+publish = false
 
 version = { workspace = true }
 edition = { workspace = true }

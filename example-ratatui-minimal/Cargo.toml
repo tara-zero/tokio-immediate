@@ -10,6 +10,7 @@ repository = { workspace = true }
 readme = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
+publish = false
 
 [features]
 # Dummy feature to make `rust-analyzer` happy.
