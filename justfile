@@ -1,4 +1,4 @@
-set shell := ["sh", "-ceu"]
+set shell := ["sh", "-ce"]
 set positional-arguments := true
 
 exe_ext := if os() == "windows" { ".exe" } else { "" }
