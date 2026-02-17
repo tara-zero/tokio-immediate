@@ -21,7 +21,7 @@
 
 use ::std::hint::unreachable_unchecked;
 use ::std::mem::replace;
-use ::std::ops::{Deref, DerefMut};
+use ::std::ops::Deref;
 use ::std::panic::resume_unwind;
 use ::std::sync::atomic::{AtomicBool, Ordering};
 use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
@@ -56,6 +56,11 @@ pub mod trigger;
 /// associated viewport through its [`AsyncGlueWaker`], so the UI is
 /// guaranteed to run at least one more frame to observe the result.
 ///
+/// Manual state changes through [`start()`](Self::start) and
+/// [`take_state()`](Self::take_state) also request wake-ups by default.
+/// This can be configured via
+/// [`set_wake_up_on_manual_state_change()`](Self::set_wake_up_on_manual_state_change).
+///
 /// `T` is the output type of the spawned future. `A` controls how the
 /// Tokio runtime is accessed: the default [`AsyncGlueCurrentRuntime`] uses
 /// the thread-local runtime context (set by
@@ -84,6 +89,7 @@ where
 {
     state: AsyncGlueState<T>,
     waker: AsyncGlueWaker,
+    wake_up_on_manual_state_change: bool,
     runtime: A,
 }
 
@@ -231,17 +237,6 @@ where
     }
 }
 
-impl<T, A, U> AsMut<U> for AsyncGlue<T, A>
-where
-    T: 'static + Send,
-    A: AsyncGlueRuntime,
-    <Self as Deref>::Target: AsMut<U>,
-{
-    fn as_mut(&mut self) -> &mut U {
-        self.deref_mut().as_mut()
-    }
-}
-
 impl<T, A> Deref for AsyncGlue<T, A>
 where
     T: 'static + Send,
@@ -251,16 +246,6 @@ where
 
     fn deref(&self) -> &Self::Target {
         &self.state
-    }
-}
-
-impl<T, A> DerefMut for AsyncGlue<T, A>
-where
-    T: 'static + Send,
-    A: AsyncGlueRuntime,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.state
     }
 }
 
@@ -289,12 +274,17 @@ where
         Self {
             state: AsyncGlueState::Stopped,
             waker,
+            wake_up_on_manual_state_change: true,
             runtime,
         }
     }
 
     /// Spawns `future` on the runtime and moves the state to
     /// [`Running`](AsyncGlueState::Running).
+    ///
+    /// If [`wake_up_on_manual_state_change`](Self::wake_up_on_manual_state_change)
+    /// is enabled (default), this requests a wake-up immediately after the
+    /// state transition.
     ///
     /// Returns the **previous** state. If a task was already running, the
     /// caller is responsible for deciding what to do with the old
@@ -304,6 +294,10 @@ where
     where
         Fut: 'static + Send + Future<Output = T>,
     {
+        if self.wake_up_on_manual_state_change {
+            self.waker.wake_up();
+        }
+
         let waker = self.waker.clone();
         replace(
             &mut self.state,
@@ -313,6 +307,38 @@ where
                 value
             })),
         )
+    }
+
+    /// Takes the current state, leaving [`Stopped`](AsyncGlueState::Stopped)
+    /// in its place.
+    ///
+    /// If [`wake_up_on_manual_state_change`](Self::wake_up_on_manual_state_change)
+    /// is enabled (default), this requests a wake-up immediately after the
+    /// state transition.
+    #[must_use]
+    pub fn take_state(&mut self) -> AsyncGlueState<T> {
+        if self.wake_up_on_manual_state_change {
+            self.waker.wake_up();
+        }
+
+        replace(&mut self.state, AsyncGlueState::Stopped)
+    }
+
+    /// Returns whether manual state changes should trigger wake-ups.
+    ///
+    /// When enabled, [`start()`](Self::start) and [`take_state()`](Self::take_state)
+    /// call [`AsyncGlueWakeUp::wake_up`] on this glue's waker after changing
+    /// state.
+    #[must_use]
+    pub fn wake_up_on_manual_state_change(&self) -> bool {
+        self.wake_up_on_manual_state_change
+    }
+
+    /// Enables or disables wake-ups triggered by manual state changes.
+    ///
+    /// This affects [`start()`](Self::start) and [`take_state()`](Self::take_state).
+    pub fn set_wake_up_on_manual_state_change(&mut self, wake_up_on_manual_state_change: bool) {
+        self.wake_up_on_manual_state_change = wake_up_on_manual_state_change;
     }
 
     /// Checks whether the running task has finished and, if so, collects
@@ -328,7 +354,9 @@ where
         if let AsyncGlueState::Running(join_handle) = &self.state
             && join_handle.is_finished()
         {
-            let AsyncGlueState::Running(join_handle) = self.state.take_state() else {
+            let AsyncGlueState::Running(join_handle) =
+                replace(&mut self.state, AsyncGlueState::Stopped)
+            else {
                 unsafe {
                     // SAFETY: We already checked that state is `AsyncGlueState::Running`.
                     unreachable_unchecked()
@@ -352,13 +380,6 @@ impl<T> AsyncGlueState<T>
 where
     T: 'static + Send,
 {
-    /// Takes the current state, leaving [`Stopped`](Self::Stopped) in its
-    /// place.
-    #[must_use]
-    pub fn take_state(&mut self) -> Self {
-        replace(self, AsyncGlueState::Stopped)
-    }
-
     /// Returns `true` if the state is [`Stopped`](Self::Stopped).
     #[must_use]
     pub fn is_stopped(&self) -> bool {

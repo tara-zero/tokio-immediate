@@ -97,9 +97,6 @@ impl ExampleApp {
                 };
 
                 if start_new_task {
-                    // Immediately trigger the next frame to show the state change.
-                    self.viewport.wake_up();
-
                     // Start new asynchronous task.
                     let addr_port = self.addr_port.clone();
                     let _ = self.tcping.start(async move {

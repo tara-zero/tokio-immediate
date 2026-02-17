@@ -68,6 +68,7 @@ mod tests {
             })
         });
         let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
+        glue.set_wake_up_on_manual_state_change(false);
         let _ = glue.start(async {
             tokio::time::sleep(Duration::from_millis(200)).await;
             1_u32
@@ -87,6 +88,85 @@ mod tests {
 
         assert!(glue.is_stopped());
         assert_eq!(wake_count.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn start_wakes_up_on_manual_state_change_by_default() {
+        let runtime = Runtime::new().expect("runtime should initialize");
+        let wake_count = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let wake_count = wake_count.clone();
+            Arc::new(move || {
+                wake_count.fetch_add(1, Ordering::Relaxed);
+            })
+        });
+        let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
+
+        assert!(glue.wake_up_on_manual_state_change());
+        let _ = glue.start(async {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            1_u32
+        });
+
+        assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn manual_state_change_wake_up_can_be_disabled() {
+        let runtime = Runtime::new().expect("runtime should initialize");
+        let wake_count = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let wake_count = wake_count.clone();
+            Arc::new(move || {
+                wake_count.fetch_add(1, Ordering::Relaxed);
+            })
+        });
+        let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
+
+        glue.set_wake_up_on_manual_state_change(false);
+        assert!(!glue.wake_up_on_manual_state_change());
+
+        let _ = glue.start(async {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            1_u32
+        });
+        assert_eq!(wake_count.load(Ordering::Relaxed), 0);
+
+        let previous = glue.take_state();
+        match previous {
+            AsyncGlueState::Running(task) => task.abort(),
+            _ => panic!("state should be running after start"),
+        }
+        assert_eq!(wake_count.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn take_state_wakes_up_when_manual_state_change_wake_up_enabled() {
+        let runtime = Runtime::new().expect("runtime should initialize");
+        let wake_count = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let wake_count = wake_count.clone();
+            Arc::new(move || {
+                wake_count.fetch_add(1, Ordering::Relaxed);
+            })
+        });
+        let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
+
+        glue.set_wake_up_on_manual_state_change(false);
+        let _ = glue.start(async {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            1_u32
+        });
+        assert_eq!(wake_count.load(Ordering::Relaxed), 0);
+
+        glue.set_wake_up_on_manual_state_change(true);
+        let previous = glue.take_state();
+        match previous {
+            AsyncGlueState::Running(task) => task.abort(),
+            _ => panic!("state should be running after start"),
+        }
+        assert!(glue.is_stopped());
+        assert_eq!(wake_count.load(Ordering::Relaxed), 1);
     }
 
     #[test]
