@@ -85,9 +85,10 @@ mod tests {
             }
             thread_sleep(Duration::from_millis(1));
         }
+        thread_sleep(Duration::from_millis(10));
 
         assert!(glue.is_stopped());
-        assert_eq!(wake_count.load(Ordering::Relaxed), 0);
+        assert_eq!(wake_count.load(Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -281,7 +282,7 @@ mod tests {
         let waker = viewport.new_waker();
 
         {
-            let _guard = waker.guard();
+            let _guard = waker.wake_up_guard();
             assert_eq!(wake_count.load(Ordering::Relaxed), 0);
         }
 

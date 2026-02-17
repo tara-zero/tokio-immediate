@@ -154,18 +154,26 @@ type AsyncGlueWakeUpSlot = RwLock<Option<AsyncGlueWakeUpCallback>>;
 pub type AsyncGlueWakeUpCallback = Arc<dyn Fn() + Send + Sync>;
 
 /// RAII guard that wakes up on drop.
-pub struct AsyncGlueWakeUpGuard<'a, W>
+pub struct AsyncGlueWakeUpGuard<W>
 where
-    W: ?Sized + AsyncGlueWakeUp,
+    W: AsyncGlueWakeUp,
 {
-    waker: &'a W,
+    waker: W,
 }
 
 /// Common interface for types that can request a viewport wake-up.
 pub trait AsyncGlueWakeUp {
     /// Creates a guard that calls [`AsyncGlueWakeUp::wake_up`] when dropped.
     #[must_use]
-    fn guard(&self) -> AsyncGlueWakeUpGuard<'_, Self>
+    fn wake_up_guard(&self) -> AsyncGlueWakeUpGuard<&Self>
+    where
+        Self: Sized,
+    {
+        AsyncGlueWakeUpGuard { waker: self }
+    }
+
+    #[must_use]
+    fn wake_up_guard_owned(self) -> AsyncGlueWakeUpGuard<Self>
     where
         Self: Sized,
     {
@@ -298,11 +306,11 @@ where
             self.waker.wake_up();
         }
 
-        let waker = self.waker.clone();
+        let wake_up_guard = self.waker.clone().wake_up_guard_owned();
         replace(
             &mut self.state,
             AsyncGlueState::Running(self.runtime.spawn(async move {
-                let _wake_up_guard = waker.guard();
+                let _wake_up_guard = wake_up_guard;
                 future.await
             })),
         )
@@ -624,21 +632,20 @@ impl AsyncGlueWaker {
     }
 }
 
-impl<W> Deref for AsyncGlueWakeUpGuard<'_, W>
+impl<W> Deref for AsyncGlueWakeUpGuard<W>
 where
-    W: ?Sized + AsyncGlueWakeUp,
+    W: AsyncGlueWakeUp,
 {
     type Target = W;
 
     fn deref(&self) -> &Self::Target {
-        self.waker
+        &self.waker
     }
 }
 
-impl<W, T> AsRef<T> for AsyncGlueWakeUpGuard<'_, W>
+impl<W, T> AsRef<T> for AsyncGlueWakeUpGuard<W>
 where
-    W: ?Sized + AsyncGlueWakeUp,
-    T: ?Sized,
+    W: AsyncGlueWakeUp,
     <Self as Deref>::Target: AsRef<T>,
 {
     fn as_ref(&self) -> &T {
@@ -646,12 +653,21 @@ where
     }
 }
 
-impl<W> Drop for AsyncGlueWakeUpGuard<'_, W>
+impl<W> Drop for AsyncGlueWakeUpGuard<W>
 where
-    W: ?Sized + AsyncGlueWakeUp,
+    W: AsyncGlueWakeUp,
 {
     fn drop(&mut self) {
         self.waker.wake_up();
+    }
+}
+
+impl<T> AsyncGlueWakeUp for &T
+where
+    T: AsyncGlueWakeUp,
+{
+    fn wake_up(&self) {
+        (*self).wake_up();
     }
 }
 
