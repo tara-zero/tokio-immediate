@@ -366,8 +366,8 @@ where
             if let Some(value) = self.runtime.block_on(join_handle) {
                 self.state = AsyncGlueState::Completed(value);
             }
-            // Do nothing if task was aborted, `AsyncGlueState::take()` already changed state
-            // to `AsyncGlueState::Stopped`.
+            // Do nothing if task was aborted: state was already changed to
+            // `AsyncGlueState::Stopped` above.
 
             true
         } else {

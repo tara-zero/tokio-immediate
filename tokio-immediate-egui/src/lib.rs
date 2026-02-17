@@ -256,7 +256,7 @@ impl EguiAsync {
         inner
             .context
             .as_ref()
-            .expect("No egui context, EguiAsyncPlugin is not initialized yet")
+            .expect("No egui context: EguiAsyncPlugin is not initialized yet")
     }
 
     fn inner_mut(&self) -> RwLockWriteGuard<'_, EguiAsyncPluginInner> {
@@ -428,7 +428,7 @@ impl EguiAsyncPlugin {
     ) -> RwLockReadGuard<'_, EguiAsyncPluginInner> {
         inner
             .read()
-            .expect("Failed to read EguiAsyncPlugin: poisoned by panic in another thread")
+            .expect("Failed to read-lock EguiAsyncPlugin: poisoned by panic in another thread")
     }
 
     fn inner_mut(
@@ -436,7 +436,7 @@ impl EguiAsyncPlugin {
     ) -> RwLockWriteGuard<'_, EguiAsyncPluginInner> {
         inner
             .write()
-            .expect("Failed to write EguiAsyncPlugin: poisoned by panic in another thread")
+            .expect("Failed to write-lock EguiAsyncPlugin: poisoned by panic in another thread")
     }
 
     fn upgrade(&self) -> EguiAsync {
@@ -444,7 +444,7 @@ impl EguiAsyncPlugin {
             inner: self
                 .inner
                 .upgrade()
-                .expect("EguiAsyncPlugin failed because EguiAsync was dropped"),
+                .expect("EguiAsyncPlugin outlived its EguiAsync owner"),
         }
     }
 }
