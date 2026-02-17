@@ -191,8 +191,8 @@ impl ExampleApp {
 
         ui.separator();
         ui.label("Simple asynchronous task:");
-        ui.label("sleep few seconds");
-        ui.label("and then return concatenated string");
+        ui.label("sleep for a few seconds");
+        ui.label("then return the concatenated string");
         Self::ui_add_space(ui);
 
         self.async_concat.poll();
@@ -263,9 +263,9 @@ impl ExampleApp {
 
         ui.separator();
         ui.label("Complex asynchronous task:");
-        ui.label("download file from URL into /dev/null");
+        ui.label("download a file from a URL into /dev/null");
         ui.label("continuously report progress");
-        ui.label("graceful cancellation using cancellation handle");
+        ui.label("gracefully cancel using a cancellation handle");
         Self::ui_add_space(ui);
 
         self.async_download.poll();
@@ -283,7 +283,7 @@ impl ExampleApp {
             self.download
                 .sender
                 .im_send(None)
-                .expect("Impossible: receiver is in the same structure");
+                .expect("Impossible: progress receiver and sender are in the same struct");
 
             let trigger = self.egui_async.new_trigger_for_root();
             let _ = self.async_download.start(Self::download(
@@ -376,7 +376,7 @@ impl ExampleApp {
 
         let size = file
             .content_length()
-            .ok_or_else(|| String::from("No content length"))?;
+            .ok_or_else(|| String::from("Missing content length"))?;
 
         let mut stream = file.bytes_stream();
         let mut downloaded = 0;
@@ -400,9 +400,7 @@ impl ExampleApp {
         if downloaded == size {
             Ok(DownloadProgress::new(downloaded, size, start.elapsed()))
         } else {
-            Err(format!(
-                "Size does not match: {downloaded} != {size} (expected)"
-            ))
+            Err(format!("Size mismatch: {downloaded} != {size} (expected)"))
         }
     }
 
