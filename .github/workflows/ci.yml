@@ -8,8 +8,8 @@ on:
     workflow_dispatch:
 
 jobs:
-    ci:
-        name: ${{ matrix.recipe }}
+    ci-linux:
+        name: Linux ${{ matrix.recipe }}
         runs-on: ubuntu-latest
         container:
             image: ghcr.io/tara-zero/tokio-immediate-ci-base:main-2026-02-16
@@ -27,6 +27,34 @@ jobs:
         steps:
             - name: Checkout repository
               uses: actions/checkout@v6
+
+            - name: Run CI recipe
+              run: just ${{ matrix.recipe }}
+
+    ci-macos:
+        name: macOS ${{ matrix.recipe }}
+        runs-on: macos-latest
+
+        strategy:
+            fail-fast: false
+            matrix:
+                recipe:
+                    - clippy
+                    - build
+                    - test
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v6
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  toolchain: 1.93.1
+                  components: clippy
+
+            - name: Install just
+              uses: taiki-e/install-action@just
 
             - name: Run CI recipe
               run: just ${{ matrix.recipe }}
