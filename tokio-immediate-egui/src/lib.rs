@@ -16,6 +16,7 @@
 //! | `*_for(viewport_id)` | An explicit [`ViewportId`] |
 //!
 //! ## Feature flags
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(
     feature = "document-features",
     cfg_attr(doc, doc = ::document_features::document_features!())
