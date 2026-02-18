@@ -310,6 +310,9 @@ where
         replace(
             &mut self.state,
             AsyncGlueState::Running(self.runtime.spawn(async move {
+                // TODO: This can be racy: GUI thread may still think that task is running after we sent
+                // the wake up notification. Maybe add another flag and stop relying on
+                // tokio's JoinHandle::is_finished()?
                 let _wake_up_guard = wake_up_guard;
                 future.await
             })),
