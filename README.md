@@ -11,10 +11,10 @@ The repository includes runnable examples for several immediate UI frameworks:
 
 | Example | Framework |
 |---|---|
-| [`example-egui`](example-egui/src/main.rs) | `egui` + `eframe` |
-| [`example-egui-minimal`](example-egui-minimal/src/main.rs) | `egui` + `eframe` |
-| [`example-imgui-minimal`](example-imgui-minimal/src/main.rs) | Dear ImGui (`dear-imgui-rs` + `dear-app`) |
-| [`example-ratatui-minimal`](example-ratatui-minimal/src/main.rs) | `ratatui` + `crossterm` |
+| [`example-egui`](https://github.com/tara-zero/tokio-immediate/blob/main/example-egui/src/main.rs) | `egui` + `eframe` |
+| [`example-egui-minimal`](https://github.com/tara-zero/tokio-immediate/blob/main/example-egui-minimal/src/main.rs) | `egui` + `eframe` |
+| [`example-imgui-minimal`](https://github.com/tara-zero/tokio-immediate/blob/main/example-imgui-minimal/src/main.rs) | Dear ImGui (`dear-imgui-rs` + `dear-app`) |
+| [`example-ratatui-minimal`](https://github.com/tara-zero/tokio-immediate/blob/main/example-ratatui-minimal/src/main.rs) | `ratatui` + `crossterm` |
 
 The full `egui` example demonstrates multi-viewport support, `sync::watch` channels for
 streaming progress updates, and cancellation tokens.
@@ -23,8 +23,10 @@ streaming progress updates, and cancellation tokens.
 
 ## Crates
 
-* `tokio-immediate` - Core library, framework-agnostic
-* `tokio-immediate-egui` - Optional [egui](https://github.com/emilk/egui) integration via an `egui::Plugin`
+| Crate | Docs | Description |
+|---|---|---|
+| [`tokio-immediate`](https://crates.io/crates/tokio-immediate) | [`docs.rs/tokio-immediate`](https://docs.rs/tokio-immediate) | Core library, framework-agnostic |
+| [`tokio-immediate-egui`](https://crates.io/crates/tokio-immediate-egui) | [`docs.rs/tokio-immediate-egui`](https://docs.rs/tokio-immediate-egui) | Optional [egui](https://github.com/emilk/egui) integration via an `egui::Plugin` |
 
 ## Simplified code (with egui-specific helper plugin)
 
@@ -64,7 +66,7 @@ that owns the `AsyncGlue`, so you never miss the result.
 
 ## Development
 
-A [`justfile`](justfile) provides common development recipes (need [`just`](https://github.com/casey/just) to run):
+A [`justfile`](https://github.com/tara-zero/tokio-immediate/blob/main/justfile) provides common development recipes (need [`just`](https://github.com/casey/just) to run):
 
 ```sh
 just clippy   # lint with Clippy (all crates, all feature combinations)
