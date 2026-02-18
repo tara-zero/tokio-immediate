@@ -3,14 +3,14 @@ name = "tokio-immediate-tests"
 description = "Tests for tokio-immediate"
 publish = false
 
-version = { workspace = true }
-edition = { workspace = true }
-authors = { workspace = true }
-license = { workspace = true }
-repository = { workspace = true }
-readme = { workspace = true }
-keywords = { workspace = true }
-categories = { workspace = true }
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [features]
 default = []
@@ -19,7 +19,7 @@ default = []
 sync = ["tokio-immediate/sync"]
 
 [dev-dependencies]
-tokio-immediate = { workspace = true }
+tokio-immediate.workspace = true
 
 [dev-dependencies.tokio]
 workspace = true

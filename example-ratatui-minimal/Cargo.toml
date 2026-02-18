@@ -2,14 +2,14 @@
 name = "tokio-immediate-example-ratatui-minimal"
 description = "ratatui + tokio-immediate minimal usage example"
 
-version = { workspace = true }
-edition = { workspace = true }
-authors = { workspace = true }
-license = { workspace = true }
-repository = { workspace = true }
-readme = { workspace = true }
-keywords = { workspace = true }
-categories = { workspace = true }
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 publish = false
 
 [features]
@@ -17,8 +17,8 @@ publish = false
 sync = []
 
 [dependencies]
-futures-util = { workspace = true }
-tokio-immediate = { workspace = true }
+futures-util.workspace = true
+tokio-immediate.workspace = true
 
 [dependencies.crossterm]
 workspace = true

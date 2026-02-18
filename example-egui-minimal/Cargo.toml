@@ -3,14 +3,14 @@ name = "tokio-immediate-example-egui-minimal"
 description = "egui + tokio-immediate minimal usage example"
 publish = false
 
-version = { workspace = true }
-edition = { workspace = true }
-authors = { workspace = true }
-license = { workspace = true }
-repository = { workspace = true }
-readme = { workspace = true }
-keywords = { workspace = true }
-categories = { workspace = true }
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [features]
 # Dummy feature to make `rust-analyzer` happy.
@@ -18,7 +18,7 @@ categories = { workspace = true }
 sync = []
 
 [dependencies]
-tokio-immediate-egui = { workspace = true }
+tokio-immediate-egui.workspace = true
 
 [dependencies.eframe]
 workspace = true
