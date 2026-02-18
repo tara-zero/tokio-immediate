@@ -39,7 +39,7 @@ use tokio_immediate_egui::{AsyncGlue, AsyncGlueState, EguiAsync};
 // During app setup - create an EguiAsync and register its plugin:
 let egui_async = EguiAsync::default();
 cc.egui_ctx.add_plugin(egui_async.plugin());
-let task: AsyncGlue<String> = egui_async.new_glue();
+let mut task: AsyncGlue<String> = egui_async.new_glue();
 
 // In your update() loop:
 task.poll(); // check for completion — call once per frame
