@@ -89,6 +89,7 @@ where
 {
     state: AsyncGlueState<T>,
     waker: AsyncGlueWaker,
+    task_is_finishing: Arc<AtomicBool>,
     wake_up_on_manual_state_change: bool,
     runtime: A,
 }
@@ -159,6 +160,11 @@ where
     W: AsyncGlueWakeUp,
 {
     waker: W,
+}
+
+struct AsyncGlueTaskFinishNotifier {
+    task_is_finishing: Arc<AtomicBool>,
+    waker: AsyncGlueWaker,
 }
 
 /// Common interface for types that can request a viewport wake-up.
@@ -282,6 +288,7 @@ where
         Self {
             state: AsyncGlueState::Stopped,
             waker,
+            task_is_finishing: Arc::new(AtomicBool::new(false)),
             wake_up_on_manual_state_change: true,
             runtime,
         }
@@ -306,13 +313,15 @@ where
             self.waker.wake_up();
         }
 
-        let wake_up_guard = self.waker.clone().wake_up_guard_owned();
+        self.task_is_finishing = Arc::new(AtomicBool::new(false));
+        let wake_up_guard = AsyncGlueTaskFinishNotifier {
+            task_is_finishing: self.task_is_finishing.clone(),
+            waker: self.waker.clone(),
+        }
+        .wake_up_guard_owned();
         replace(
             &mut self.state,
             AsyncGlueState::Running(self.runtime.spawn(async move {
-                // TODO: This can be racy: GUI thread may still think that task is running after we sent
-                // the wake up notification. Maybe add another flag and stop relying on
-                // tokio's JoinHandle::is_finished()?
                 let _wake_up_guard = wake_up_guard;
                 future.await
             })),
@@ -361,9 +370,17 @@ where
     ///
     /// Call this once per frame, before inspecting the state.
     pub fn poll(&mut self) -> bool {
-        if let AsyncGlueState::Running(join_handle) = &self.state
-            && join_handle.is_finished()
-        {
+        if let AsyncGlueState::Running(join_handle) = &self.state {
+            if !self.task_is_finishing.load(Ordering::Acquire) {
+                return false;
+            }
+
+            if !join_handle.is_finished() {
+                // Tokio runtime is still working with finishing task, will need another redraw.
+                self.waker.wake_up();
+                return false;
+            }
+
             let AsyncGlueState::Running(join_handle) =
                 replace(&mut self.state, AsyncGlueState::Stopped)
             else {
@@ -661,6 +678,13 @@ where
     W: AsyncGlueWakeUp,
 {
     fn drop(&mut self) {
+        self.waker.wake_up();
+    }
+}
+
+impl AsyncGlueWakeUp for AsyncGlueTaskFinishNotifier {
+    fn wake_up(&self) {
+        self.task_is_finishing.store(true, Ordering::Release);
         self.waker.wake_up();
     }
 }
