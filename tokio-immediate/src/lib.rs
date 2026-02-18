@@ -27,8 +27,10 @@ use ::std::hint::unreachable_unchecked;
 use ::std::mem::replace;
 use ::std::ops::Deref;
 use ::std::panic::resume_unwind;
+use ::std::pin::Pin;
 use ::std::sync::atomic::{AtomicBool, Ordering};
 use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
+use ::std::task::{Context, Poll};
 
 use ::tokio::runtime::Handle;
 use ::tokio::task::JoinHandle;
@@ -157,6 +159,17 @@ pub struct AsyncGlueWaker {
 
 type AsyncGlueWakeUpSlot = RwLock<Option<AsyncGlueWakeUpCallback>>;
 pub type AsyncGlueWakeUpCallback = Arc<dyn Fn() + Send + Sync>;
+
+struct AsyncGlueTask<Fut>
+where
+    Fut: Future,
+{
+    // Make sure that task future is dropped before wake-up notification is sent.
+    // This minimizes the possibility of UI loop being woken up when JoinHandle::is_finished()
+    // is still false.
+    future: Fut,
+    _wake_up_guard: AsyncGlueWakeUpGuard<AsyncGlueTaskFinishNotifier>,
+}
 
 /// RAII guard that wakes up on drop.
 pub struct AsyncGlueWakeUpGuard<W>
@@ -323,12 +336,14 @@ where
             waker: self.waker.clone(),
         }
         .wake_up_guard_owned();
+
+        let task = AsyncGlueTask {
+            future,
+            _wake_up_guard: wake_up_guard,
+        };
         replace(
             &mut self.state,
-            AsyncGlueState::Running(self.runtime.spawn(async move {
-                let _wake_up_guard = wake_up_guard;
-                future.await
-            })),
+            AsyncGlueState::Running(self.runtime.spawn(task)),
         )
     }
 
@@ -653,6 +668,23 @@ impl AsyncGlueWaker {
     #[must_use]
     pub fn is_same_viewport(&self, other: &Self) -> bool {
         self.wake_up_requested.as_ptr() == other.wake_up_requested.as_ptr()
+    }
+}
+
+impl<Fut> Future for AsyncGlueTask<Fut>
+where
+    Fut: Future,
+{
+    type Output = Fut::Output;
+
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        unsafe {
+            // SAFETY: Once `AsyncGlueTask` is pinned by the executor, `future` will not be moved
+            // anywhere. We only create a pinned projection to poll it in place.
+            let this = self.as_mut().get_unchecked_mut();
+            Pin::new_unchecked(&mut this.future)
+        }
+        .poll(context)
     }
 }
 

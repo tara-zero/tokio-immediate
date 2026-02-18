@@ -7,6 +7,7 @@ mod trigger;
 
 #[cfg(test)]
 mod tests {
+    use ::core::future::pending;
     use ::std::sync::Arc;
     use ::std::sync::atomic::{AtomicUsize, Ordering};
     use ::std::thread::sleep as thread_sleep;
@@ -199,6 +200,89 @@ mod tests {
         match &*glue {
             AsyncGlueState::Completed(value) => assert_eq!(*value, 9_u32),
             _ => panic!("second task should complete"),
+        }
+    }
+
+    #[test]
+    fn future_is_dropped_before_finish_notifier_wake_up_on_normal_completion() {
+        let runtime = Runtime::new().expect("runtime should initialize");
+        let steps = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let steps = steps.clone();
+            Arc::new(move || {
+                steps
+                    .compare_exchange(1, 2, Ordering::Relaxed, Ordering::Relaxed)
+                    .expect("wake_up happened out of order for normal completion");
+            })
+        });
+        let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
+        glue.set_wake_up_on_manual_state_change(false);
+        let task_steps = steps.clone();
+        let drop_probe = ZeroToOneOnDrop { value: task_steps };
+
+        let _ = glue.start(async move {
+            let _drop_probe = drop_probe;
+            7_u32
+        });
+
+        for _ in 0..50 {
+            if glue.poll() {
+                break;
+            }
+            thread_sleep(Duration::from_millis(1));
+        }
+
+        assert!(glue.is_completed());
+        assert_eq!(steps.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn future_is_dropped_before_finish_notifier_wake_up_when_task_is_aborted() {
+        let runtime = Runtime::new().expect("runtime should initialize");
+        let steps = Arc::new(AtomicUsize::new(0));
+        let viewport = AsyncGlueViewport::new_with_wake_up({
+            let steps = steps.clone();
+            Arc::new(move || {
+                steps
+                    .compare_exchange(1, 2, Ordering::Relaxed, Ordering::Relaxed)
+                    .expect("wake_up happened out of order for abort");
+            })
+        });
+        let mut glue: AsyncGlue<u32, _> = viewport.new_glue_with_runtime(runtime.handle().clone());
+        glue.set_wake_up_on_manual_state_change(false);
+        let task_steps = steps.clone();
+        let drop_probe = ZeroToOneOnDrop { value: task_steps };
+        let _ = glue.start(async move {
+            let _drop_probe = drop_probe;
+
+            pending::<u32>().await
+        });
+
+        match &*glue {
+            AsyncGlueState::Running(task) => task.abort(),
+            _ => panic!("state should be running after start"),
+        }
+
+        for _ in 0..50 {
+            if glue.poll() {
+                break;
+            }
+            thread_sleep(Duration::from_millis(1));
+        }
+
+        assert!(glue.is_stopped());
+        assert_eq!(steps.load(Ordering::Relaxed), 2);
+    }
+
+    struct ZeroToOneOnDrop {
+        value: Arc<AtomicUsize>,
+    }
+
+    impl Drop for ZeroToOneOnDrop {
+        fn drop(&mut self) {
+            self.value
+                .compare_exchange(0, 1, Ordering::Relaxed, Ordering::Relaxed)
+                .expect("drop happened out of order");
         }
     }
 
