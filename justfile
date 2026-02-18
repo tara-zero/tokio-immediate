@@ -3,12 +3,6 @@ set positional-arguments := true
 
 exe_ext := if os() == "windows" { ".exe" } else { "" }
 
-# GitHub Linux runners replace image's HOME with some nonsense that messes up
-# with our container setup.
-# Non-container CI environments does not need this workaround.
-
-export HOME := if os() == "linux" { if lowercase(env("GITHUB_ACTIONS", "false")) == "true" { "/root" } else { env("HOME") } } else { env("HOME") }
-
 # Use `mold` linker in devcontainer/CI.
 
 export RUSTFLAGS := if env("DEVCONTAINER_HAS_MOLD", "0") == "1" { env("RUSTFLAGS", "") + " -C linker=clang -C link-arg=-fuse-ld=mold" } else { env("RUSTFLAGS", "") }

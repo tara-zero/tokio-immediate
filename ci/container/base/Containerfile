@@ -3,6 +3,7 @@ ARG rocky_version=8
 FROM quay.io/rockylinux/rockylinux:${rocky_version}
 
 # Must be in sync with `$SRC_ROOT/rust-toolchain.toml`.
+# Must be in sync with `$SRC_ROOT/.github/workflows/ci.yml`.
 ARG rust_toolchain_version="1.93.1"
 ARG rust_toolchain_profile="default"
 ARG rust_toolchain_components="rust-analyzer,rust-src"

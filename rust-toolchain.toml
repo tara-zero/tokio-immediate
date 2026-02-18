@@ -1,5 +1,6 @@
 [toolchain]
 # Must be in sync with `$SRC_ROOT/ci/container/base/Containerfile`.
+# Must be in sync with `$SRC_ROOT/.github/workflows/ci.yml`.
 # Do not forget to generate new CI images (both base and caches) after updating this.
 channel = "1.93.1"
 profile = "default"
