@@ -1,5 +1,8 @@
 # tokio-immediate
 
+[![docs.rs `tokio-immediate`](https://img.shields.io/docsrs/tokio-immediate?logo=docs.rs)](https://docs.rs/tokio-immediate)
+[![docs.rs `tokio-immediate-egui`](https://img.shields.io/docsrs/tokio-immediate-egui?logo=docs.rs)](https://docs.rs/tokio-immediate-egui)
+
 Primitives for calling asynchronous code from immediate mode UIs.
 
 **tokio-immediate** manages asynchronous tasks for you and wakes up the main UI loop when task completes or sends
