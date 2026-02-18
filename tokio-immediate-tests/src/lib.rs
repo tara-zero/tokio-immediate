@@ -134,11 +134,12 @@ mod tests {
         assert_eq!(wake_count.load(Ordering::Relaxed), 0);
 
         let previous = glue.take_state();
-        match previous {
-            AsyncGlueState::Running(task) => task.abort(),
+        let task = match previous {
+            AsyncGlueState::Running(task) => task,
             _ => panic!("state should be running after start"),
-        }
+        };
         assert_eq!(wake_count.load(Ordering::Relaxed), 0);
+        task.abort();
     }
 
     #[test]
@@ -162,12 +163,13 @@ mod tests {
 
         glue.set_wake_up_on_manual_state_change(true);
         let previous = glue.take_state();
-        match previous {
-            AsyncGlueState::Running(task) => task.abort(),
+        let task = match previous {
+            AsyncGlueState::Running(task) => task,
             _ => panic!("state should be running after start"),
-        }
+        };
         assert!(glue.is_stopped());
         assert_eq!(wake_count.load(Ordering::Relaxed), 1);
+        task.abort();
     }
 
     #[test]
