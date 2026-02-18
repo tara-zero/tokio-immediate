@@ -13,6 +13,7 @@
 //! enabling continuous progress reporting from async tasks to the UI.
 //!
 //! ## Feature flags
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(
     feature = "document-features",
     cfg_attr(doc, doc = ::document_features::document_features!())
