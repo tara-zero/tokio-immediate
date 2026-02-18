@@ -22,7 +22,6 @@ readme = "README.md"
 
 keywords = [
     "async",
-    "non-blocking",
     "futures",
     "gui",
     "imgui",
