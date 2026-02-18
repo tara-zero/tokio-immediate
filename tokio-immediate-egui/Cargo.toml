@@ -11,10 +11,13 @@ readme = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = []
 
-## Enable `trigger` and wrappers for various `tokio::sync` primitives.
+## Enable viewport-aware wrappers around [`tokio::sync`] channels and a [`trigger`] notification channel.
 sync = ["tokio-immediate/sync"]
 
 [dependencies.document-features]
