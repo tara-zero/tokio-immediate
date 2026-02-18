@@ -19,6 +19,8 @@ The repository includes runnable examples for several immediate UI frameworks:
 The full `egui` example demonstrates multi-viewport support, `sync::watch` channels for
 streaming progress updates, and cancellation tokens.
 
+![](https://raw.githubusercontent.com/tara-zero/tokio-immediate.assets/553df9e137a5677780ad95bb12df34f56a4126a4/README.files/example-egui-full.gif)
+
 ## Crates
 
 * `tokio-immediate` - Core library, framework-agnostic
