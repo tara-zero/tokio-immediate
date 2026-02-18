@@ -2,6 +2,11 @@
 
 #![warn(clippy::pedantic)]
 
+// TODO: Investigate why second window stops receiving repaint notifications when
+//  * main windows is constantly repainting (because of an animation)
+//  * main window is active
+//  * second window is inactive but visible.
+
 use ::std::sync::{Arc, Mutex};
 use ::std::time::{Duration, Instant};
 
