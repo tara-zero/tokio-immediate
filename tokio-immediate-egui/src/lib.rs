@@ -26,19 +26,15 @@ use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use ::egui::{Context, FullOutput, OrderedViewportIdMap, Plugin, RawInput, ViewportId};
 
-/// Re-export `tokio` crate.
 pub use ::tokio_immediate::tokio;
 
-/// Re-export `tokio-immediate::sync` module.
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use ::tokio_immediate::sync;
-/// Re-export `tokio-immediate::trigger` module.
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use ::tokio_immediate::trigger;
 
-/// Re-export other `tokio-immediate` stuff.
 pub use ::tokio_immediate::{
     AsyncGlue, AsyncGlueCurrentRuntime, AsyncGlueRuntime, AsyncGlueState, AsyncGlueViewport,
     AsyncGlueWakeUp, AsyncGlueWakeUpCallback, AsyncGlueWakeUpGuard, AsyncGlueWaker,
