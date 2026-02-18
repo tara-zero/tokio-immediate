@@ -7,7 +7,7 @@ use ::std::sync::Arc;
 use ::std::time::Duration;
 
 use ::crossterm::event::{Event, EventStream, KeyCode, KeyModifiers};
-use ::futures_util::StreamExt as _;
+use ::futures_util::{FutureExt as _, StreamExt as _};
 use ::ratatui::Frame;
 use ::ratatui::layout::{Constraint, Layout};
 use ::ratatui::style::{Color, Style, Styled, Stylize};
@@ -28,6 +28,11 @@ fn main() {
 
     let _restore = RestoreGuard;
     let mut terminal = ::ratatui::init();
+
+    // Drain initial event stream to make sure that we are not reacting to stale events.
+    let mut events = EventStream::new();
+    while events.next().now_or_never().is_some() {}
+    drop(events);
     let mut events = EventStream::new();
 
     let (sender, mut receiver) = watch::channel(());
@@ -89,6 +94,7 @@ impl ExampleApp {
 
     fn handle_event(&mut self, event: &Event) -> bool {
         if let Event::Key(key) = event
+            && key.is_press()
             && key.modifiers.contains(KeyModifiers::CONTROL)
         {
             match key.code {
@@ -105,6 +111,7 @@ impl ExampleApp {
                 _ => {}
             }
         } else if let Event::Key(key) = event
+            && key.is_press()
             && (key.code == KeyCode::Enter)
             && !self.tcping.is_running()
         {
