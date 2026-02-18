@@ -13,7 +13,10 @@
 //! enabling continuous progress reporting from async tasks to the UI.
 //!
 //! ## Feature flags
-#![doc = document_features::document_features!()]
+#![cfg_attr(
+    feature = "document-features",
+    cfg_attr(doc, doc = ::document_features::document_features!())
+)]
 //
 // Clippy lints.
 #![warn(clippy::pedantic)]

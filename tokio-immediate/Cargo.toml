@@ -20,8 +20,12 @@ default = []
 ## Enable viewport-aware wrappers around [`tokio::sync`] channels and a [`trigger`] notification channel.
 sync = ["tokio/sync"]
 
+# Describe feature flags in generated doc.
+document-features = ["dep:document-features"]
+
 [dependencies.document-features]
 workspace = true
+optional = true
 features = [
     "default",
 ]
