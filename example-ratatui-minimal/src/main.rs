@@ -137,7 +137,8 @@ impl ExampleApp {
                 Ok(())
             });
         } else if self.addr_port.handle_event(event).is_some() {
-            // Pass all other events to the input field.
+            // Else: pass all other events to the input field.
+            // Trigger a redraw if input field state was changed.
             self.viewport.wake_up();
         }
 
