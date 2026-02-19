@@ -1,7 +1,7 @@
 # tokio-immediate
 
-[![docs.rs `tokio-immediate`](https://img.shields.io/docsrs/tokio-immediate?logo=docs.rs)](https://docs.rs/tokio-immediate)
-[![docs.rs `tokio-immediate-egui`](https://img.shields.io/docsrs/tokio-immediate-egui?logo=docs.rs)](https://docs.rs/tokio-immediate-egui)
+[![docs.rs `tokio-immediate`](https://img.shields.io/docsrs/tokio-immediate?logo=docs.rs&label=docs%3A%20tokio-immediate)](https://docs.rs/tokio-immediate)
+[![docs.rs `tokio-immediate-egui`](https://img.shields.io/docsrs/tokio-immediate-egui?logo=docs.rs&label=docs%3A%20tokio-immediate-egui)](https://docs.rs/tokio-immediate-egui)
 
 Primitives for calling asynchronous code from immediate mode UIs.
 
