@@ -114,6 +114,12 @@ impl<T> DerefMut for Sender<T> {
     }
 }
 
+impl<T> AsyncGlueWakeUp for Sender<T> {
+    fn wake_up(&self) {
+        self.wakers.wake_up();
+    }
+}
+
 impl<T> Sender<T>
 where
     T: Clone,
@@ -164,12 +170,6 @@ where
             sender: self.sender.downgrade(),
             wakers: self.wakers.clone(),
         }
-    }
-}
-
-impl<T> AsyncGlueWakeUp for Sender<T> {
-    fn wake_up(&self) {
-        self.wakers.wake_up();
     }
 }
 

@@ -105,6 +105,12 @@ impl<T> DerefMut for Sender<T> {
     }
 }
 
+impl<T> AsyncGlueWakeUp for Sender<T> {
+    fn wake_up(&self) {
+        self.binding.wake_up();
+    }
+}
+
 impl<T> Sender<T> {
     /// Sends a value through this oneshot channel, notifying the bound
     /// receiver viewport.
@@ -118,12 +124,6 @@ impl<T> Sender<T> {
             self.binding.wake_up();
         }
         result
-    }
-}
-
-impl<T> AsyncGlueWakeUp for Sender<T> {
-    fn wake_up(&self) {
-        self.binding.wake_up();
     }
 }
 

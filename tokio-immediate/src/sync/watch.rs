@@ -100,6 +100,12 @@ impl<T> DerefMut for Sender<T> {
     }
 }
 
+impl<T> AsyncGlueWakeUp for Sender<T> {
+    fn wake_up(&self) {
+        self.wakers.wake_up();
+    }
+}
+
 impl<T> Sender<T> {
     /// Creates a new [`Sender`] with the given initial value and an empty
     /// waker list.
@@ -165,12 +171,6 @@ impl<T> Sender<T> {
     #[must_use]
     pub fn im_subscribe(&self) -> Receiver<T> {
         Receiver::new(self.sender.subscribe(), self.wakers.clone())
-    }
-}
-
-impl<T> AsyncGlueWakeUp for Sender<T> {
-    fn wake_up(&self) {
-        self.wakers.wake_up();
     }
 }
 
