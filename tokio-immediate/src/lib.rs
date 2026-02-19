@@ -82,6 +82,10 @@ pub mod trigger;
 /// Dropping an `AsyncGlue` whose task is still running will abort the task,
 /// block until it finishes, and discard the result. The Tokio runtime
 /// **must** still be alive at that point; otherwise the process will abort.
+/// To avoid this abort-and-wait-on-drop behaviour, call
+/// [`take_state()`](Self::take_state) first and take ownership of the returned
+/// [`AsyncGlueState::Running`]([`JoinHandle`](tokio::task::JoinHandle)),
+/// then decide its lifecycle yourself (for example: drop it, abort it, or await it).
 ///
 /// If the spawned future panicked and the panic was never observed through
 /// [`poll()`](Self::poll), the drop implementation re-raises it with
