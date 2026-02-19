@@ -99,6 +99,16 @@ pub struct Sender<T> {
     binding: WakerBinding,
 }
 
+/// A weak sending handle for a viewport-aware mpsc channel.
+///
+/// Wraps a [`tokio::sync::mpsc::WeakSender<T>`] and derefs to it, so the full
+/// Tokio API is available. Use [`im_upgrade()`](Self::im_upgrade) to
+/// upgrade it back to a [`Sender`].
+pub struct WeakSender<T> {
+    sender: mpsc::WeakSender<T>,
+    binding: WakerBinding,
+}
+
 /// The receiving half of a viewport-aware mpsc channel.
 ///
 /// Wraps a [`tokio::sync::mpsc::Receiver<T>`] and derefs to it, so the full
@@ -119,6 +129,16 @@ pub struct Receiver<T> {
 /// additionally wake up the bound receiver viewport.
 pub struct UnboundedSender<T> {
     sender: mpsc::UnboundedSender<T>,
+    binding: WakerBinding,
+}
+
+/// A weak sending handle for a viewport-aware unbounded mpsc channel.
+///
+/// Wraps a [`tokio::sync::mpsc::WeakUnboundedSender<T>`] and derefs to it, so
+/// the full Tokio API is available. Use [`im_upgrade()`](Self::im_upgrade) to
+/// upgrade it back to an [`UnboundedSender`].
+pub struct WeakUnboundedSender<T> {
+    sender: mpsc::WeakUnboundedSender<T>,
     binding: WakerBinding,
 }
 
@@ -145,7 +165,25 @@ impl<T> Clone for Sender<T> {
     }
 }
 
+impl<T> Clone for WeakSender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            binding: self.binding.clone(),
+        }
+    }
+}
+
 impl<T> Clone for UnboundedSender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            binding: self.binding.clone(),
+        }
+    }
+}
+
+impl<T> Clone for WeakUnboundedSender<T> {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
@@ -215,11 +253,63 @@ impl<T> Sender<T> {
         }
         result
     }
+
+    /// Creates a [`WeakSender`] that does not keep the channel alive.
+    #[must_use]
+    pub fn im_downgrade(&self) -> WeakSender<T> {
+        WeakSender {
+            sender: self.sender.downgrade(),
+            binding: self.binding.clone(),
+        }
+    }
 }
 
 impl<T> AsyncGlueWakeUp for Sender<T> {
     fn wake_up(&self) {
         self.binding.wake_up();
+    }
+}
+
+impl<T, U> AsRef<U> for WeakSender<T>
+where
+    <Self as Deref>::Target: AsRef<U>,
+{
+    fn as_ref(&self) -> &U {
+        self.deref().as_ref()
+    }
+}
+
+impl<T, U> AsMut<U> for WeakSender<T>
+where
+    <Self as Deref>::Target: AsMut<U>,
+{
+    fn as_mut(&mut self) -> &mut U {
+        self.deref_mut().as_mut()
+    }
+}
+
+impl<T> Deref for WeakSender<T> {
+    type Target = mpsc::WeakSender<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sender
+    }
+}
+
+impl<T> DerefMut for WeakSender<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.sender
+    }
+}
+
+impl<T> WeakSender<T> {
+    /// Attempts to upgrade this weak sender to a strong [`Sender`].
+    #[must_use]
+    pub fn im_upgrade(&self) -> Option<Sender<T>> {
+        self.sender.upgrade().map(|sender| Sender {
+            sender,
+            binding: self.binding.clone(),
+        })
     }
 }
 
@@ -269,11 +359,63 @@ impl<T> UnboundedSender<T> {
         }
         result
     }
+
+    /// Creates a [`WeakUnboundedSender`] that does not keep the channel alive.
+    #[must_use]
+    pub fn im_downgrade(&self) -> WeakUnboundedSender<T> {
+        WeakUnboundedSender {
+            sender: self.sender.downgrade(),
+            binding: self.binding.clone(),
+        }
+    }
 }
 
 impl<T> AsyncGlueWakeUp for UnboundedSender<T> {
     fn wake_up(&self) {
         self.binding.wake_up();
+    }
+}
+
+impl<T, U> AsRef<U> for WeakUnboundedSender<T>
+where
+    <Self as Deref>::Target: AsRef<U>,
+{
+    fn as_ref(&self) -> &U {
+        self.deref().as_ref()
+    }
+}
+
+impl<T, U> AsMut<U> for WeakUnboundedSender<T>
+where
+    <Self as Deref>::Target: AsMut<U>,
+{
+    fn as_mut(&mut self) -> &mut U {
+        self.deref_mut().as_mut()
+    }
+}
+
+impl<T> Deref for WeakUnboundedSender<T> {
+    type Target = mpsc::WeakUnboundedSender<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sender
+    }
+}
+
+impl<T> DerefMut for WeakUnboundedSender<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.sender
+    }
+}
+
+impl<T> WeakUnboundedSender<T> {
+    /// Attempts to upgrade this weak sender to a strong [`UnboundedSender`].
+    #[must_use]
+    pub fn im_upgrade(&self) -> Option<UnboundedSender<T>> {
+        self.sender.upgrade().map(|sender| UnboundedSender {
+            sender,
+            binding: self.binding.clone(),
+        })
     }
 }
 
