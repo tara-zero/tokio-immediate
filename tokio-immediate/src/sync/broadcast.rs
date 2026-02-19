@@ -50,6 +50,16 @@ pub struct Sender<T> {
     wakers: AsyncGlueWakerList,
 }
 
+/// A weak sending handle for a viewport-aware broadcast channel.
+///
+/// Wraps a [`tokio::sync::broadcast::WeakSender<T>`] and derefs to it, so the
+/// full Tokio API is available. Use [`im_upgrade()`](Self::im_upgrade) to
+/// upgrade it back to a [`Sender`] that supports viewport-aware sending.
+pub struct WeakSender<T> {
+    sender: broadcast::WeakSender<T>,
+    wakers: AsyncGlueWakerList,
+}
+
 /// The receiving half of a viewport-aware broadcast channel.
 ///
 /// Wraps a [`tokio::sync::broadcast::Receiver<T>`] and derefs to it, so the
@@ -146,11 +156,72 @@ where
     pub fn im_subscribe(&self) -> Receiver<T> {
         Receiver::new(self.sender.subscribe(), self.wakers.clone())
     }
+
+    /// Creates a [`WeakSender`] that does not keep the channel alive.
+    #[must_use]
+    pub fn im_downgrade(&self) -> WeakSender<T> {
+        WeakSender {
+            sender: self.sender.downgrade(),
+            wakers: self.wakers.clone(),
+        }
+    }
 }
 
 impl<T> AsyncGlueWakeUp for Sender<T> {
     fn wake_up(&self) {
         self.wakers.wake_up();
+    }
+}
+
+impl<T> Clone for WeakSender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            wakers: self.wakers.clone(),
+        }
+    }
+}
+
+impl<T, U> AsRef<U> for WeakSender<T>
+where
+    <Self as Deref>::Target: AsRef<U>,
+{
+    fn as_ref(&self) -> &U {
+        self.deref().as_ref()
+    }
+}
+
+impl<T, U> AsMut<U> for WeakSender<T>
+where
+    <Self as Deref>::Target: AsMut<U>,
+{
+    fn as_mut(&mut self) -> &mut U {
+        self.deref_mut().as_mut()
+    }
+}
+
+impl<T> Deref for WeakSender<T> {
+    type Target = broadcast::WeakSender<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.sender
+    }
+}
+
+impl<T> DerefMut for WeakSender<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.sender
+    }
+}
+
+impl<T> WeakSender<T> {
+    /// Attempts to upgrade this weak sender to a strong [`Sender`].
+    #[must_use]
+    pub fn im_upgrade(&self) -> Option<Sender<T>> {
+        self.sender.upgrade().map(|sender| Sender {
+            sender,
+            wakers: self.wakers.clone(),
+        })
     }
 }
 
