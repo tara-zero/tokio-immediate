@@ -6,6 +6,7 @@
 //  * main windows is constantly repainting (because of an animation)
 //  * main window is active
 //  * second window is inactive but visible.
+// Maybe related to https://github.com/rust-windowing/winit/issues/3648
 
 use ::std::sync::{Arc, Mutex};
 use ::std::time::{Duration, Instant};

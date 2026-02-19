@@ -102,6 +102,8 @@ RUN cargo \
         "just"
 RUN just --completions "bash" >/etc/bash_completion.d/just
 
+# TODO: Add cargo-docs-rs and install nightly rust for it.
+
 # Remove caches.
 RUN dnf clean all
 RUN rm -rf "/root/.cargo/registry"
