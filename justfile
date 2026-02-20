@@ -57,11 +57,11 @@ fmt:
 check:
     cargo check --workspace --all-targets --all-features
 
-[doc("Run `cargo doc...`")]
+[doc("Run `cargo docs-rs...`")]
 [group("Development")]
 doc:
-    cargo doc --package "tokio-immediate" --no-deps --all-features
-    cargo doc --package "tokio-immediate-egui" --no-deps --all-features
+    cargo +nightly docs-rs --package "tokio-immediate"
+    cargo +nightly docs-rs --package "tokio-immediate-egui"
 
 [doc("Run `cargo clippy`")]
 [group("Development")]
