@@ -5,6 +5,7 @@ use ::std::sync::atomic::{AtomicUsize, Ordering};
 
 use ::tokio_immediate::AsyncGlueViewport;
 use ::tokio_immediate::sync::broadcast;
+use ::tokio_immediate::sync::broadcast::TryRecvError;
 
 #[tokio::test]
 async fn channel_with_waker_wakes_on_im_send() {
@@ -183,4 +184,53 @@ fn weak_sender_upgrade_fails_without_strong_senders() {
         weak_sender.im_upgrade().is_none(),
         "upgrade should fail once all strong senders are dropped"
     );
+}
+
+#[test]
+fn take_stops_on_empty_and_respects_limit() {
+    let (sender, mut receiver) = broadcast::channel::<u32>(8);
+
+    sender.im_send(1).expect("send should succeed");
+    sender.im_send(2).expect("send should succeed");
+
+    let collected: Vec<Result<u32, TryRecvError>> = receiver.im_take(3).collect();
+    assert_eq!(collected, vec![Ok(1), Ok(2)]);
+}
+
+#[test]
+fn take_yields_closed_on_disconnected() {
+    let (sender, mut receiver) = broadcast::channel::<u32>(8);
+
+    sender.im_send(1).expect("send should succeed");
+    drop(sender);
+
+    let collected: Vec<Result<u32, TryRecvError>> = receiver.im_take(3).collect();
+    assert_eq!(collected, vec![Ok(1), Err(TryRecvError::Closed)]);
+}
+
+#[test]
+fn take_current_uses_current_len() {
+    let (sender, mut receiver) = broadcast::channel::<u32>(8);
+
+    sender.im_send(1).expect("send should succeed");
+    sender.im_send(2).expect("send should succeed");
+    sender.im_send(3).expect("send should succeed");
+
+    let collected: Vec<Result<u32, TryRecvError>> = receiver.im_take_current().collect();
+    assert_eq!(collected, vec![Ok(1), Ok(2), Ok(3)]);
+}
+
+#[test]
+fn take_yields_lagged_error() {
+    let (sender, mut receiver) = broadcast::channel::<u32>(2);
+
+    sender.im_send(1).expect("send should succeed");
+    sender.im_send(2).expect("send should succeed");
+    sender.im_send(3).expect("send should succeed");
+
+    let first = receiver
+        .im_take(1)
+        .next()
+        .expect("iterator should yield lagged error");
+    assert_eq!(first, Err(TryRecvError::Lagged(1)));
 }
