@@ -12,7 +12,7 @@ jobs:
         name: Linux ${{ matrix.recipe }}
         runs-on: ubuntu-latest
         container:
-            image: ghcr.io/tara-zero/tokio-immediate-ci-base:main-2026-02-16
+            image: ghcr.io/tara-zero/tokio-immediate-ci-base:main-2026-02-20
 
         strategy:
             fail-fast: false
