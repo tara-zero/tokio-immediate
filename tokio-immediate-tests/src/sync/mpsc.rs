@@ -245,3 +245,57 @@ fn weak_unbounded_sender_upgrade_fails_without_strong_senders() {
         "upgrade should fail once all strong senders are dropped"
     );
 }
+
+#[test]
+fn take_stops_on_empty_and_respects_limit() {
+    let (sender, mut receiver) = mpsc::channel::<u32>(8);
+
+    sender.im_try_send(1).expect("send should succeed");
+    sender.im_try_send(2).expect("send should succeed");
+
+    let collected: Vec<Option<u32>> = receiver.im_take(3).collect();
+    assert_eq!(collected, vec![Some(1), Some(2)]);
+}
+
+#[test]
+fn take_yields_none_on_disconnected() {
+    let (sender, mut receiver) = mpsc::channel::<u32>(8);
+
+    sender.im_try_send(1).expect("send should succeed");
+    drop(sender);
+
+    let collected: Vec<Option<u32>> = receiver.im_take(3).collect();
+    assert_eq!(collected, vec![Some(1), None]);
+}
+
+#[test]
+fn take_current_uses_current_len() {
+    let (sender, mut receiver) = mpsc::channel::<u32>(8);
+
+    sender.im_try_send(1).expect("send should succeed");
+    sender.im_try_send(2).expect("send should succeed");
+    sender.im_try_send(3).expect("send should succeed");
+
+    let collected: Vec<Option<u32>> = receiver.im_take_current().collect();
+    assert_eq!(collected, vec![Some(1), Some(2), Some(3)]);
+}
+
+#[test]
+fn unbounded_take_and_take_current_behave_like_bounded_take() {
+    let (sender, mut receiver) = mpsc::unbounded_channel::<u32>();
+
+    sender.im_send(1).expect("send should succeed");
+    sender.im_send(2).expect("send should succeed");
+
+    let limited: Vec<Option<u32>> = receiver.im_take(1).collect();
+    assert_eq!(limited, vec![Some(1)]);
+
+    sender.im_send(3).expect("send should succeed");
+    drop(sender);
+
+    let current: Vec<Option<u32>> = receiver.im_take_current().collect();
+    assert_eq!(current, vec![Some(2), Some(3)]);
+
+    let disconnected: Vec<Option<u32>> = receiver.im_take(1).collect();
+    assert_eq!(disconnected, vec![None]);
+}

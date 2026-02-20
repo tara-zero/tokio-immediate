@@ -122,6 +122,19 @@ pub struct Receiver<T> {
     binding: WakerBinding,
 }
 
+/// A non-blocking iterator over up to `n` values from a [`Receiver`].
+///
+/// Yields:
+/// - `Some(item)` when an item is available
+/// - `None` when the channel is disconnected
+///
+/// Iteration stops early without yielding when the channel is currently empty.
+pub struct ReceiverTake<'a, T> {
+    receiver: &'a mut mpsc::Receiver<T>,
+    remaining: usize,
+    emitted_disconnected: bool,
+}
+
 /// The sending half of a viewport-aware unbounded mpsc channel.
 ///
 /// Wraps a [`tokio::sync::mpsc::UnboundedSender<T>`] and derefs to it, so the
@@ -154,6 +167,19 @@ pub struct WeakUnboundedSender<T> {
 pub struct UnboundedReceiver<T> {
     receiver: mpsc::UnboundedReceiver<T>,
     binding: WakerBinding,
+}
+
+/// A non-blocking iterator over up to `n` values from an [`UnboundedReceiver`].
+///
+/// Yields:
+/// - `Some(item)` when an item is available
+/// - `None` when the channel is disconnected
+///
+/// Iteration stops early without yielding when the channel is currently empty.
+pub struct UnboundedReceiverTake<'a, T> {
+    receiver: &'a mut mpsc::UnboundedReceiver<T>,
+    remaining: usize,
+    emitted_disconnected: bool,
 }
 
 impl<T> Clone for Sender<T> {
@@ -340,11 +366,55 @@ impl<T> Receiver<T> {
     pub fn im_clear_waker(&self) {
         self.binding.clear_waker();
     }
+
+    /// Creates a non-blocking iterator that yields at most `n` elements.
+    ///
+    /// The iterator uses [`try_recv()`](tokio::sync::mpsc::Receiver::try_recv):
+    /// it stops early when the channel is empty and yields `None` if the
+    /// channel is disconnected.
+    #[must_use]
+    pub fn im_take(&mut self, n: usize) -> ReceiverTake<'_, T> {
+        ReceiverTake {
+            receiver: &mut self.receiver,
+            remaining: n,
+            emitted_disconnected: false,
+        }
+    }
+
+    /// Creates a non-blocking iterator over currently buffered elements.
+    ///
+    /// Equivalent to `self.im_take(self.len())`.
+    #[must_use]
+    pub fn im_take_current(&mut self) -> ReceiverTake<'_, T> {
+        self.im_take(self.receiver.len())
+    }
 }
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
         self.binding.clear_waker();
+    }
+}
+
+impl<T> Iterator for ReceiverTake<'_, T> {
+    type Item = Option<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 || self.emitted_disconnected {
+            return None;
+        }
+
+        match self.receiver.try_recv() {
+            Ok(item) => {
+                self.remaining -= 1;
+                Some(Some(item))
+            }
+            Err(mpsc::error::TryRecvError::Empty) => None,
+            Err(mpsc::error::TryRecvError::Disconnected) => {
+                self.emitted_disconnected = true;
+                Some(None)
+            }
+        }
     }
 }
 
@@ -517,10 +587,54 @@ impl<T> UnboundedReceiver<T> {
     pub fn im_clear_waker(&self) {
         self.binding.clear_waker();
     }
+
+    /// Creates a non-blocking iterator that yields at most `n` elements.
+    ///
+    /// The iterator uses [`try_recv()`](tokio::sync::mpsc::UnboundedReceiver::try_recv):
+    /// it stops early when the channel is empty and yields `None` if the
+    /// channel is disconnected.
+    #[must_use]
+    pub fn im_take(&mut self, n: usize) -> UnboundedReceiverTake<'_, T> {
+        UnboundedReceiverTake {
+            receiver: &mut self.receiver,
+            remaining: n,
+            emitted_disconnected: false,
+        }
+    }
+
+    /// Creates a non-blocking iterator over currently buffered elements.
+    ///
+    /// Equivalent to `self.im_take(self.len())`.
+    #[must_use]
+    pub fn im_take_current(&mut self) -> UnboundedReceiverTake<'_, T> {
+        self.im_take(self.receiver.len())
+    }
 }
 
 impl<T> Drop for UnboundedReceiver<T> {
     fn drop(&mut self) {
         self.binding.clear_waker();
+    }
+}
+
+impl<T> Iterator for UnboundedReceiverTake<'_, T> {
+    type Item = Option<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 || self.emitted_disconnected {
+            return None;
+        }
+
+        match self.receiver.try_recv() {
+            Ok(item) => {
+                self.remaining -= 1;
+                Some(Some(item))
+            }
+            Err(mpsc::error::TryRecvError::Empty) => None,
+            Err(mpsc::error::TryRecvError::Disconnected) => {
+                self.emitted_disconnected = true;
+                Some(None)
+            }
+        }
     }
 }
