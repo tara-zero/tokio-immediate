@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+### Fixed
+
+## [0.1.2] - 2026-02-20
+
+### Added
 - Added wrappers for `tokio::sync::broadcast::WeakSender`.
 - Added wrappers for `tokio::sync::mpsc::WeakSender` and `tokio::sync::mpsc::WeakUnboundedSender`.
 - Added `take()` and `take_current()` for sync `mpsc` receivers.
@@ -18,6 +23,7 @@
 ### Added
 - Initial release.
 
-[Unreleased]: https://github.com/tara-zero/tokio-immediate/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/tara-zero/tokio-immediate/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/tara-zero/tokio-immediate/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/tara-zero/tokio-immediate/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/tara-zero/tokio-immediate/releases/tag/v0.1.0
