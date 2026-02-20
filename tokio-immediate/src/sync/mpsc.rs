@@ -392,6 +392,7 @@ impl<T> Receiver<T> {
 
 impl<T> Drop for Receiver<T> {
     fn drop(&mut self) {
+        // Senders has nothing to wake up as this type of channel is single-receiver.
         self.binding.clear_waker();
     }
 }
@@ -613,6 +614,7 @@ impl<T> UnboundedReceiver<T> {
 
 impl<T> Drop for UnboundedReceiver<T> {
     fn drop(&mut self) {
+        // Senders has nothing to wake up as this type of channel is single-receiver.
         self.binding.clear_waker();
     }
 }
