@@ -27,6 +27,7 @@
 * Use `just clippy` to check for compilation warnings/errors and Clippy warnings/errors.
 * Use `just test` to run tests (if needed).
 * Use `just doc` to generate documentation.
+* Use `just fmt-check` to check code formatting.
 
 Provided `justfile` runs `cargo` commands with right combinations of packages and enabled features.
 
