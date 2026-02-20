@@ -3,13 +3,13 @@
 use ::std::sync::Arc;
 use ::std::sync::atomic::{AtomicUsize, Ordering};
 
-use ::tokio_immediate::AsyncGlueViewport;
+use ::tokio_immediate::AsyncViewport;
 use ::tokio_immediate::sync::watch;
 
 #[test]
 fn channel_with_waker_wakes_on_im_send() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -28,7 +28,7 @@ fn channel_with_waker_wakes_on_im_send() {
 #[test]
 fn failed_send_does_not_wake() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -52,7 +52,7 @@ fn failed_send_does_not_wake() {
 #[test]
 fn im_send_modify_wakes_and_updates_value() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -71,7 +71,7 @@ fn im_send_modify_wakes_and_updates_value() {
 #[test]
 fn im_send_if_modified_only_wakes_when_modified() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -96,7 +96,7 @@ fn im_send_if_modified_only_wakes_when_modified() {
 #[test]
 fn im_send_replace_wakes_and_returns_old_value() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -114,7 +114,7 @@ fn im_send_replace_wakes_and_returns_old_value() {
 #[test]
 fn clone_without_waker_does_not_wake() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let _viewport = AsyncGlueViewport::new_with_wake_up({
+    let _viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -131,7 +131,7 @@ fn clone_without_waker_does_not_wake() {
 #[test]
 fn clone_with_waker_wakes_and_unregisters_on_drop() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);

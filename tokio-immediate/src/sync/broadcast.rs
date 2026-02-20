@@ -5,15 +5,15 @@ use ::std::ops::{Deref, DerefMut};
 use ::tokio::sync::broadcast;
 
 use crate::sync::waker_registration::WakerRegistration;
-use crate::{AsyncGlueWakeUp, AsyncGlueWaker, AsyncGlueWakerList};
+use crate::{AsyncWakeUp, AsyncWaker, AsyncWakerList};
 
 /// Creates a new broadcast channel, returning a [`Sender`] and a [`Receiver`]
-/// that is already registered with the given [`AsyncGlueWaker`].
+/// that is already registered with the given [`AsyncWaker`].
 ///
 /// The receiver's viewport will be woken up whenever a value is sent through
 /// [`Sender::im_send`].
 #[must_use]
-pub fn channel_with_waker<T>(capacity: usize, waker: AsyncGlueWaker) -> (Sender<T>, Receiver<T>)
+pub fn channel_with_waker<T>(capacity: usize, waker: AsyncWaker) -> (Sender<T>, Receiver<T>)
 where
     T: Clone,
 {
@@ -47,7 +47,7 @@ where
 /// wake up all viewports that hold a registered [`Receiver`].
 pub struct Sender<T> {
     sender: broadcast::Sender<T>,
-    wakers: AsyncGlueWakerList,
+    wakers: AsyncWakerList,
 }
 
 /// A weak sending handle for a viewport-aware broadcast channel.
@@ -57,7 +57,7 @@ pub struct Sender<T> {
 /// upgrade it back to a [`Sender`] that supports viewport-aware sending.
 pub struct WeakSender<T> {
     sender: broadcast::WeakSender<T>,
-    wakers: AsyncGlueWakerList,
+    wakers: AsyncWakerList,
 }
 
 /// The receiving half of a viewport-aware broadcast channel.
@@ -66,7 +66,7 @@ pub struct WeakSender<T> {
 /// full Tokio API is available (e.g.
 /// [`recv()`](tokio::sync::broadcast::Receiver::recv)).
 ///
-/// A receiver optionally carries an [`AsyncGlueWaker`] that is registered in
+/// A receiver optionally carries an [`AsyncWaker`] that is registered in
 /// the sender's waker list.
 pub struct Receiver<T> {
     receiver: broadcast::Receiver<T>,
@@ -138,7 +138,7 @@ impl<T> DerefMut for Sender<T> {
     }
 }
 
-impl<T> AsyncGlueWakeUp for Sender<T> {
+impl<T> AsyncWakeUp for Sender<T> {
     fn wake_up(&self) {
         self.wakers.wake_up();
     }
@@ -156,7 +156,7 @@ where
 
         Self {
             sender,
-            wakers: AsyncGlueWakerList::default(),
+            wakers: AsyncWakerList::default(),
         }
     }
 
@@ -175,9 +175,9 @@ where
     }
 
     /// Creates a new [`Receiver`] subscribed to this sender, registered with
-    /// the given [`AsyncGlueWaker`].
+    /// the given [`AsyncWaker`].
     #[must_use]
-    pub fn im_subscribe_with_waker(&self, waker: AsyncGlueWaker) -> Receiver<T> {
+    pub fn im_subscribe_with_waker(&self, waker: AsyncWaker) -> Receiver<T> {
         Receiver::new_with_waker(self.sender.subscribe(), self.wakers.clone(), waker)
     }
 
@@ -282,10 +282,10 @@ impl<T> DerefMut for Receiver<T> {
 }
 
 impl<T> Receiver<T> {
-    /// Resubscribes this receiver and registers the given [`AsyncGlueWaker`] on
+    /// Resubscribes this receiver and registers the given [`AsyncWaker`] on
     /// the new receiver.
     #[must_use]
-    pub fn im_resubscribe_with_waker(&self, waker: AsyncGlueWaker) -> Self
+    pub fn im_resubscribe_with_waker(&self, waker: AsyncWaker) -> Self
     where
         T: Clone,
     {
@@ -337,8 +337,8 @@ impl<T> Receiver<T> {
 
     fn new_with_waker(
         receiver: broadcast::Receiver<T>,
-        wakers: AsyncGlueWakerList,
-        waker: AsyncGlueWaker,
+        wakers: AsyncWakerList,
+        waker: AsyncWaker,
     ) -> Self {
         Self {
             receiver,
@@ -346,7 +346,7 @@ impl<T> Receiver<T> {
         }
     }
 
-    fn new(receiver: broadcast::Receiver<T>, wakers: AsyncGlueWakerList) -> Self {
+    fn new(receiver: broadcast::Receiver<T>, wakers: AsyncWakerList) -> Self {
         Self {
             receiver,
             inner: WakerRegistration::new(wakers),

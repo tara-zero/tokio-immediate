@@ -5,15 +5,15 @@ use ::std::ops::{Deref, DerefMut};
 use ::tokio::sync::mpsc;
 
 use crate::sync::waker_binding::WakerBinding;
-use crate::{AsyncGlueWakeUp, AsyncGlueWaker};
+use crate::{AsyncWakeUp, AsyncWaker};
 
 /// Creates a new mpsc channel, returning a [`Sender`] and a [`Receiver`]
-/// that is already bound to the given [`AsyncGlueWaker`].
+/// that is already bound to the given [`AsyncWaker`].
 ///
 /// The receiver's viewport will be woken up whenever a value is sent through
 /// [`Sender::im_send`] or [`Sender::im_try_send`] successfully.
 #[must_use]
-pub fn channel_with_waker<T>(capacity: usize, waker: AsyncGlueWaker) -> (Sender<T>, Receiver<T>) {
+pub fn channel_with_waker<T>(capacity: usize, waker: AsyncWaker) -> (Sender<T>, Receiver<T>) {
     let (sender, receiver) = mpsc::channel(capacity);
     let binding = WakerBinding::default();
     binding.set_waker(waker);
@@ -48,13 +48,13 @@ pub fn channel<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
 
 /// Creates a new unbounded mpsc channel, returning an [`UnboundedSender`]
 /// and an [`UnboundedReceiver`] that is already bound to the given
-/// [`AsyncGlueWaker`].
+/// [`AsyncWaker`].
 ///
 /// The receiver's viewport will be woken up whenever a value is sent through
 /// [`UnboundedSender::im_send`] successfully.
 #[must_use]
 pub fn unbounded_channel_with_waker<T>(
-    waker: AsyncGlueWaker,
+    waker: AsyncWaker,
 ) -> (UnboundedSender<T>, UnboundedReceiver<T>) {
     let (sender, receiver) = mpsc::unbounded_channel();
     let binding = WakerBinding::default();
@@ -223,7 +223,7 @@ impl<T> DerefMut for Sender<T> {
     }
 }
 
-impl<T> AsyncGlueWakeUp for Sender<T> {
+impl<T> AsyncWakeUp for Sender<T> {
     fn wake_up(&self) {
         self.binding.wake_up();
     }
@@ -358,7 +358,7 @@ impl<T> Receiver<T> {
     ///
     /// Future successful `im_send*` calls on associated senders will request a
     /// wake-up of this viewport.
-    pub fn im_set_waker(&self, waker: AsyncGlueWaker) {
+    pub fn im_set_waker(&self, waker: AsyncWaker) {
         self.binding.set_waker(waker);
     }
 
@@ -460,7 +460,7 @@ impl<T> DerefMut for UnboundedSender<T> {
     }
 }
 
-impl<T> AsyncGlueWakeUp for UnboundedSender<T> {
+impl<T> AsyncWakeUp for UnboundedSender<T> {
     fn wake_up(&self) {
         self.binding.wake_up();
     }
@@ -580,7 +580,7 @@ impl<T> UnboundedReceiver<T> {
     ///
     /// Future successful [`UnboundedSender::im_send`] calls on associated
     /// senders will request a wake-up of this viewport.
-    pub fn im_set_waker(&self, waker: AsyncGlueWaker) {
+    pub fn im_set_waker(&self, waker: AsyncWaker) {
         self.binding.set_waker(waker);
     }
 

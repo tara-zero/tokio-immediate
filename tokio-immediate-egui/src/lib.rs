@@ -2,10 +2,10 @@
 
 //! [`egui`] integration for [`tokio_immediate`].
 //!
-//! [`EguiAsync`] manages [`AsyncGlueViewport`]s automatically using an
+//! [`EguiAsync`] manages [`AsyncViewport`]s automatically using an
 //! [`egui::Plugin`], so you only need to create it once, register the plugin,
-//! and then call its factory methods to obtain [`AsyncGlue`] instances,
-//! [`AsyncGlueWaker`]s, or [`trigger::AsyncGlueTrigger`]s.
+//! and then call its factory methods to obtain [`AsyncCall`] instances,
+//! [`AsyncWaker`]s, or [`trigger::AsyncTrigger`]s.
 //!
 //! Most factory methods come in three viewport-targeting variants:
 //!
@@ -39,27 +39,29 @@ pub use ::tokio_immediate::sync;
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use ::tokio_immediate::trigger;
 
+pub use ::tokio_immediate::single;
 pub use ::tokio_immediate::{
-    AsyncGlue, AsyncGlueCurrentRuntime, AsyncGlueRuntime, AsyncGlueState, AsyncGlueViewport,
-    AsyncGlueWakeUp, AsyncGlueWakeUpCallback, AsyncGlueWakeUpGuard, AsyncGlueWaker,
-    AsyncGlueWakerList,
+    AsyncCurrentRuntime, AsyncRuntime, AsyncViewport, AsyncWakeUp, AsyncWakeUpCallback,
+    AsyncWakeUpGuard, AsyncWaker, AsyncWakerList,
 };
 
-/// Manages [`AsyncGlueViewport`]s for all egui viewports via a [`Plugin`].
+use ::tokio_immediate::single::AsyncCall;
+
+/// Manages [`AsyncViewport`]s for all egui viewports via a [`Plugin`].
 ///
 /// Create one at application startup, register its [`plugin()`](Self::plugin)
 /// on the [`egui::Context`], and then use the factory methods to create
-/// [`AsyncGlue`] instances, [`AsyncGlueWaker`]s, or
-/// [`trigger::AsyncGlueTrigger`]s bound to the appropriate viewport.
+/// [`AsyncCall`] instances, [`AsyncWaker`]s, or
+/// [`trigger::AsyncTrigger`]s bound to the appropriate viewport.
 ///
 /// # Viewport lifetime
 ///
-/// The plugin automatically drops [`AsyncGlueViewport`]s for viewports that
+/// The plugin automatically drops [`AsyncViewport`]s for viewports that
 /// are no longer present in the egui output (i.e. closed windows). Any
-/// [`AsyncGlue`] or [`AsyncGlueWaker`] that was bound to a dropped viewport
+/// [`AsyncCall`] or [`AsyncWaker`] that was bound to a dropped viewport
 /// will silently stop requesting UI repaints — tasks still run to
 /// completion, but the UI will not be notified. Because of this, creating
-/// [`AsyncGlue`] instances for non-root viewports ahead of time is
+/// [`AsyncCall`] instances for non-root viewports ahead of time is
 /// pointless; create them only once the viewport is actually open.
 #[derive(Default, Clone)]
 pub struct EguiAsync {
@@ -71,7 +73,7 @@ pub struct EguiAsync {
 ///
 /// This is a separate type that holds a [`Weak`] reference back to the
 /// shared state in order to break a reference cycle:
-/// `EguiAsync` → `AsyncGlueViewport` → wake-up callback → `egui::Context`
+/// `EguiAsync` → `AsyncViewport` → wake-up callback → `egui::Context`
 /// → plugins → back to `EguiAsync`. The [`EguiAsync`] value must be kept
 /// alive for the plugin to function.
 ///
@@ -84,10 +86,10 @@ pub struct EguiAsyncPlugin {
 #[derive(Default)]
 struct EguiAsyncPluginInner {
     context: Option<Context>,
-    viewports: OrderedViewportIdMap<AsyncGlueViewport>,
+    viewports: OrderedViewportIdMap<AsyncViewport>,
 
     #[cfg(feature = "sync")]
-    triggers: OrderedViewportIdMap<trigger::AsyncGlueTriggerHandle>,
+    triggers: OrderedViewportIdMap<trigger::AsyncTriggerHandle>,
 }
 
 impl EguiAsync {
@@ -100,93 +102,93 @@ impl EguiAsync {
         }
     }
 
-    /// Creates an [`AsyncGlue`] bound to the root viewport, using
+    /// Creates an [`AsyncCall`] bound to the root viewport, using
     /// `A::default()` as the runtime.
     #[must_use]
-    pub fn new_glue_for_root<T, A>(&self) -> AsyncGlue<T, A>
+    pub fn new_call_for_root<T, A>(&self) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: Default + AsyncGlueRuntime,
+        A: Default + AsyncRuntime,
     {
-        AsyncGlue::new(self.new_waker_for_root())
+        AsyncCall::new(self.new_waker_for_root())
     }
 
-    /// Creates an [`AsyncGlue`] bound to the root viewport with an explicit
+    /// Creates an [`AsyncCall`] bound to the root viewport with an explicit
     /// runtime.
     #[must_use]
-    pub fn new_glue_with_runtime_for_root<T, A>(&self, runtime: A) -> AsyncGlue<T, A>
+    pub fn new_call_with_runtime_for_root<T, A>(&self, runtime: A) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: AsyncGlueRuntime,
+        A: AsyncRuntime,
     {
-        AsyncGlue::new_with_runtime(self.new_waker_for_root(), runtime)
+        AsyncCall::new_with_runtime(self.new_waker_for_root(), runtime)
     }
 
-    /// Creates an [`AsyncGlue`] bound to the current viewport, using
+    /// Creates an [`AsyncCall`] bound to the current viewport, using
     /// `A::default()` as the runtime.
     #[must_use]
-    pub fn new_glue<T, A>(&self) -> AsyncGlue<T, A>
+    pub fn new_call<T, A>(&self) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: Default + AsyncGlueRuntime,
+        A: Default + AsyncRuntime,
     {
-        AsyncGlue::new(self.new_waker())
+        AsyncCall::new(self.new_waker())
     }
 
-    /// Creates an [`AsyncGlue`] bound to the current viewport with an
+    /// Creates an [`AsyncCall`] bound to the current viewport with an
     /// explicit runtime.
     #[must_use]
-    pub fn new_glue_with_runtime<T, A>(&self, runtime: A) -> AsyncGlue<T, A>
+    pub fn new_call_with_runtime<T, A>(&self, runtime: A) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: AsyncGlueRuntime,
+        A: AsyncRuntime,
     {
-        AsyncGlue::new_with_runtime(self.new_waker(), runtime)
+        AsyncCall::new_with_runtime(self.new_waker(), runtime)
     }
 
-    /// Creates an [`AsyncGlue`] bound to `viewport_id`, using
+    /// Creates an [`AsyncCall`] bound to `viewport_id`, using
     /// `A::default()` as the runtime.
     #[must_use]
-    pub fn new_glue_for<T, A>(&self, viewport_id: ViewportId) -> AsyncGlue<T, A>
+    pub fn new_call_for<T, A>(&self, viewport_id: ViewportId) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: Default + AsyncGlueRuntime,
+        A: Default + AsyncRuntime,
     {
-        AsyncGlue::new(self.new_waker_for(viewport_id))
+        AsyncCall::new(self.new_waker_for(viewport_id))
     }
 
-    /// Creates an [`AsyncGlue`] bound to `viewport_id` with an explicit
+    /// Creates an [`AsyncCall`] bound to `viewport_id` with an explicit
     /// runtime.
     #[must_use]
-    pub fn new_glue_with_runtime_for<T, A>(
+    pub fn new_call_with_runtime_for<T, A>(
         &self,
         runtime: A,
         viewport_id: ViewportId,
-    ) -> AsyncGlue<T, A>
+    ) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: AsyncGlueRuntime,
+        A: AsyncRuntime,
     {
-        AsyncGlue::new_with_runtime(self.new_waker_for(viewport_id), runtime)
+        AsyncCall::new_with_runtime(self.new_waker_for(viewport_id), runtime)
     }
 
-    /// Creates an [`AsyncGlueWaker`] for the root viewport.
+    /// Creates an [`AsyncWaker`] for the root viewport.
     #[must_use]
-    pub fn new_waker_for_root(&self) -> AsyncGlueWaker {
+    pub fn new_waker_for_root(&self) -> AsyncWaker {
         self.new_waker_for(ViewportId::ROOT)
     }
 
-    /// Creates an [`AsyncGlueWaker`] for the current viewport.
+    /// Creates an [`AsyncWaker`] for the current viewport.
     #[must_use]
-    pub fn new_waker(&self) -> AsyncGlueWaker {
+    pub fn new_waker(&self) -> AsyncWaker {
         let inner = self.inner_mut();
         let viewport_id = Self::context(&inner).viewport_id();
         Self::new_waker_for_inner(inner, viewport_id)
     }
 
-    /// Creates an [`AsyncGlueWaker`] for `viewport_id`.
+    /// Creates an [`AsyncWaker`] for `viewport_id`.
     #[must_use]
-    pub fn new_waker_for(&self, viewport_id: ViewportId) -> AsyncGlueWaker {
+    pub fn new_waker_for(&self, viewport_id: ViewportId) -> AsyncWaker {
         Self::new_waker_for_inner(self.inner_mut(), viewport_id)
     }
 
@@ -194,12 +196,12 @@ impl EguiAsync {
     fn new_waker_for_inner(
         mut inner: RwLockWriteGuard<'_, EguiAsyncPluginInner>,
         viewport_id: ViewportId,
-    ) -> AsyncGlueWaker {
+    ) -> AsyncWaker {
         if let Some(viewport) = inner.viewports.get(&viewport_id) {
             viewport.new_waker()
         } else {
             let ctx = Self::context(&inner).clone();
-            let viewport = AsyncGlueViewport::new_with_wake_up(Arc::new(move || {
+            let viewport = AsyncViewport::new_with_wake_up(Arc::new(move || {
                 ctx.request_repaint_of(viewport_id);
             }));
             let waker = viewport.new_waker();
@@ -208,32 +210,32 @@ impl EguiAsync {
         }
     }
 
-    /// Creates an [`AsyncGlueTrigger`](trigger::AsyncGlueTrigger) for the
+    /// Creates an [`AsyncTrigger`](trigger::AsyncTrigger) for the
     /// root viewport.
     #[must_use]
     #[cfg(feature = "sync")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub fn new_trigger_for_root(&self) -> trigger::AsyncGlueTrigger {
+    pub fn new_trigger_for_root(&self) -> trigger::AsyncTrigger {
         self.new_trigger_for(ViewportId::ROOT)
     }
 
-    /// Creates an [`AsyncGlueTrigger`](trigger::AsyncGlueTrigger) for the
+    /// Creates an [`AsyncTrigger`](trigger::AsyncTrigger) for the
     /// current viewport.
     #[must_use]
     #[cfg(feature = "sync")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub fn new_trigger(&self) -> trigger::AsyncGlueTrigger {
+    pub fn new_trigger(&self) -> trigger::AsyncTrigger {
         let inner = self.inner_mut();
         let viewport_id = Self::context(&inner).viewport_id();
         Self::new_trigger_for_inner(inner, viewport_id)
     }
 
-    /// Creates an [`AsyncGlueTrigger`](trigger::AsyncGlueTrigger) for
+    /// Creates an [`AsyncTrigger`](trigger::AsyncTrigger) for
     /// `viewport_id`.
     #[must_use]
     #[cfg(feature = "sync")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub fn new_trigger_for(&self, viewport_id: ViewportId) -> trigger::AsyncGlueTrigger {
+    pub fn new_trigger_for(&self, viewport_id: ViewportId) -> trigger::AsyncTrigger {
         Self::new_trigger_for_inner(self.inner_mut(), viewport_id)
     }
 
@@ -241,11 +243,11 @@ impl EguiAsync {
     fn new_trigger_for_inner(
         mut inner: RwLockWriteGuard<'_, EguiAsyncPluginInner>,
         viewport_id: ViewportId,
-    ) -> trigger::AsyncGlueTrigger {
+    ) -> trigger::AsyncTrigger {
         if let Some(trigger) = inner.triggers.get(&viewport_id) {
             trigger.subscribe()
         } else {
-            let handle = trigger::AsyncGlueTriggerHandle::default();
+            let handle = trigger::AsyncTriggerHandle::default();
             let trigger = handle.subscribe();
             inner.triggers.insert(viewport_id, handle);
             trigger
@@ -316,86 +318,86 @@ impl Plugin for EguiAsyncPlugin {
 }
 
 impl EguiAsyncPlugin {
-    /// See [`EguiAsync::new_glue_for_root()`].
+    /// See [`EguiAsync::new_call_for_root()`].
     #[must_use]
-    pub fn new_glue_for_root<T, A>(&self) -> AsyncGlue<T, A>
+    pub fn new_call_for_root<T, A>(&self) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: Default + AsyncGlueRuntime,
+        A: Default + AsyncRuntime,
     {
-        self.upgrade().new_glue_for_root()
+        self.upgrade().new_call_for_root()
     }
 
-    /// See [`EguiAsync::new_glue_with_runtime_for_root()`].
+    /// See [`EguiAsync::new_call_with_runtime_for_root()`].
     #[must_use]
-    pub fn new_glue_with_runtime_for_root<T, A>(&self, runtime: A) -> AsyncGlue<T, A>
+    pub fn new_call_with_runtime_for_root<T, A>(&self, runtime: A) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: AsyncGlueRuntime,
+        A: AsyncRuntime,
     {
-        self.upgrade().new_glue_with_runtime_for_root(runtime)
+        self.upgrade().new_call_with_runtime_for_root(runtime)
     }
 
-    /// See [`EguiAsync::new_glue()`].
+    /// See [`EguiAsync::new_call()`].
     #[must_use]
-    pub fn new_glue<T, A>(&self) -> AsyncGlue<T, A>
+    pub fn new_call<T, A>(&self) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: Default + AsyncGlueRuntime,
+        A: Default + AsyncRuntime,
     {
-        self.upgrade().new_glue()
+        self.upgrade().new_call()
     }
 
-    /// See [`EguiAsync::new_glue_with_runtime()`].
+    /// See [`EguiAsync::new_call_with_runtime()`].
     #[must_use]
-    pub fn new_glue_with_runtime<T, A>(&self, runtime: A) -> AsyncGlue<T, A>
+    pub fn new_call_with_runtime<T, A>(&self, runtime: A) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: AsyncGlueRuntime,
+        A: AsyncRuntime,
     {
-        self.upgrade().new_glue_with_runtime(runtime)
+        self.upgrade().new_call_with_runtime(runtime)
     }
 
-    /// See [`EguiAsync::new_glue_for()`].
+    /// See [`EguiAsync::new_call_for()`].
     #[must_use]
-    pub fn new_glue_for<T, A>(&self, viewport_id: ViewportId) -> AsyncGlue<T, A>
+    pub fn new_call_for<T, A>(&self, viewport_id: ViewportId) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: Default + AsyncGlueRuntime,
+        A: Default + AsyncRuntime,
     {
-        self.upgrade().new_glue_for(viewport_id)
+        self.upgrade().new_call_for(viewport_id)
     }
 
-    /// See [`EguiAsync::new_glue_with_runtime_for()`].
+    /// See [`EguiAsync::new_call_with_runtime_for()`].
     #[must_use]
-    pub fn new_glue_with_runtime_for<T, A>(
+    pub fn new_call_with_runtime_for<T, A>(
         &self,
         runtime: A,
         viewport_id: ViewportId,
-    ) -> AsyncGlue<T, A>
+    ) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: AsyncGlueRuntime,
+        A: AsyncRuntime,
     {
         self.upgrade()
-            .new_glue_with_runtime_for(runtime, viewport_id)
+            .new_call_with_runtime_for(runtime, viewport_id)
     }
 
     /// See [`EguiAsync::new_waker_for_root()`].
     #[must_use]
-    pub fn new_waker_for_root(&self) -> AsyncGlueWaker {
+    pub fn new_waker_for_root(&self) -> AsyncWaker {
         self.upgrade().new_waker_for_root()
     }
 
     /// See [`EguiAsync::new_waker()`].
     #[must_use]
-    pub fn new_waker(&self) -> AsyncGlueWaker {
+    pub fn new_waker(&self) -> AsyncWaker {
         self.upgrade().new_waker()
     }
 
     /// See [`EguiAsync::new_waker_for()`].
     #[must_use]
-    pub fn new_waker_for(&self, viewport_id: ViewportId) -> AsyncGlueWaker {
+    pub fn new_waker_for(&self, viewport_id: ViewportId) -> AsyncWaker {
         self.upgrade().new_waker_for(viewport_id)
     }
 
@@ -403,7 +405,7 @@ impl EguiAsyncPlugin {
     #[must_use]
     #[cfg(feature = "sync")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub fn new_trigger_for_root(&self) -> trigger::AsyncGlueTrigger {
+    pub fn new_trigger_for_root(&self) -> trigger::AsyncTrigger {
         self.upgrade().new_trigger_for_root()
     }
 
@@ -411,7 +413,7 @@ impl EguiAsyncPlugin {
     #[must_use]
     #[cfg(feature = "sync")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub fn new_trigger(&self) -> trigger::AsyncGlueTrigger {
+    pub fn new_trigger(&self) -> trigger::AsyncTrigger {
         self.upgrade().new_trigger()
     }
 
@@ -419,7 +421,7 @@ impl EguiAsyncPlugin {
     #[must_use]
     #[cfg(feature = "sync")]
     #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
-    pub fn new_trigger_for(&self, viewport_id: ViewportId) -> trigger::AsyncGlueTrigger {
+    pub fn new_trigger_for(&self, viewport_id: ViewportId) -> trigger::AsyncTrigger {
         self.upgrade().new_trigger_for(viewport_id)
     }
 

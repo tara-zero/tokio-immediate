@@ -18,7 +18,8 @@ use ::tokio::runtime::Runtime;
 use ::tokio::select;
 use ::tokio::sync::watch;
 use ::tokio::time::timeout;
-use ::tokio_immediate::{AsyncGlue, AsyncGlueState, AsyncGlueViewport, AsyncGlueWakeUp};
+use ::tokio_immediate::single::{AsyncCall, AsyncCallState};
+use ::tokio_immediate::{AsyncViewport, AsyncWakeUp};
 use ::tui_input::Input;
 use ::tui_input::backend::crossterm::EventHandler;
 
@@ -37,7 +38,7 @@ fn main() {
 
     let (sender, mut receiver) = watch::channel(());
     receiver.mark_changed();
-    let viewport = AsyncGlueViewport::new_with_wake_up(Arc::new(move || sender.send_replace(())));
+    let viewport = AsyncViewport::new_with_wake_up(Arc::new(move || sender.send_replace(())));
     let mut app = ExampleApp::new(viewport);
 
     loop {
@@ -77,16 +78,16 @@ impl Drop for RestoreGuard {
 
 struct ExampleApp {
     frame_n: usize,
-    viewport: AsyncGlueViewport,
+    viewport: AsyncViewport,
     addr_port: Input,
-    tcping: AsyncGlue<Result<(), String>>,
+    tcping: AsyncCall<Result<(), String>>,
 }
 
 impl ExampleApp {
-    fn new(viewport: AsyncGlueViewport) -> Self {
+    fn new(viewport: AsyncViewport) -> Self {
         Self {
             frame_n: 0,
-            tcping: viewport.new_glue(),
+            tcping: viewport.new_call(),
             viewport,
             addr_port: Input::new(String::from("127.0.0.1:22")),
         }
@@ -102,7 +103,7 @@ impl ExampleApp {
                 KeyCode::Char('q' | 'w') => return true,
 
                 KeyCode::Char('c') => {
-                    if let AsyncGlueState::Running(join_handle) = &*self.tcping {
+                    if let AsyncCallState::Running(join_handle) = &*self.tcping {
                         // Abort task if it is running.
                         join_handle.abort();
                     }
@@ -208,21 +209,21 @@ impl ExampleApp {
         // Task result.
         match &*self.tcping {
             // Do not add any widgets when task was aborted or was never started.
-            AsyncGlueState::Stopped => {}
+            AsyncCallState::Stopped => {}
 
             // Task is running.
-            AsyncGlueState::Running(_) => {
+            AsyncCallState::Running(_) => {
                 frame.render_widget(Line::from("Waiting..."), result_area);
             }
 
             // Task completed, successfully.
-            AsyncGlueState::Completed(Ok(())) => {
+            AsyncCallState::Completed(Ok(())) => {
                 let result = Line::from("Port is open!".set_style(Color::Green));
                 frame.render_widget(result, result_area);
             }
 
             // Task completed, with an error.
-            AsyncGlueState::Completed(Err(error)) => {
+            AsyncCallState::Completed(Err(error)) => {
                 let error =
                     Line::from_iter(["TCPing failed: ".set_style(Color::Red), error.to_span()]);
                 frame.render_widget(error, result_area);

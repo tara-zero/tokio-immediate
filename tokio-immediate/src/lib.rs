@@ -2,11 +2,11 @@
 
 //! Primitives for calling asynchronous code from immediate mode GUIs.
 //!
-//! The central type is [`AsyncGlue`], which spawns a [`Future`] onto a Tokio
-//! runtime and exposes its result through a poll-based API that fits naturally
-//! into an immediate mode update loop. An [`AsyncGlueViewport`] ties a GUI
-//! viewport to a wake-up callback so that completed tasks automatically
-//! trigger a repaint.
+//! The [`single`] module contains [`AsyncCall`], which spawns a single
+//! [`Future`] onto a Tokio runtime and exposes its result through a
+//! poll-based API that fits naturally into an immediate mode update loop.
+//! An [`AsyncViewport`] ties a GUI viewport to a wake-up callback so
+//! that completed tasks automatically trigger a repaint.
 //!
 //! With the `sync` feature enabled, the [`sync`] and [`trigger`] modules
 //! provide channel wrappers that wake viewports when values are sent,
@@ -23,14 +23,11 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::cargo)]
 
-use ::std::hint::unreachable_unchecked;
 use ::std::mem::replace;
 use ::std::ops::Deref;
 use ::std::panic::resume_unwind;
-use ::std::pin::Pin;
 use ::std::sync::atomic::{AtomicBool, Ordering};
 use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
-use ::std::task::{Context, Poll};
 
 use ::tokio::runtime::Handle;
 use ::tokio::task::JoinHandle;
@@ -38,6 +35,8 @@ use ::tokio::task::JoinHandle;
 /// Re-export `tokio` crate.
 pub use ::tokio;
 
+/// Async call: spawn one [`Future`] and track its result.
+pub mod single;
 /// Wrappers around `tokio::sync` primitives that wake up viewports on send.
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
@@ -47,175 +46,89 @@ pub mod sync;
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub mod trigger;
 
-/// Bridges an asynchronous task and an immediate mode UI update loop.
-///
-/// `AsyncGlue` spawns a [`Future`] onto a Tokio runtime and tracks its
-/// lifecycle through three states: [`Stopped`](AsyncGlueState::Stopped),
-/// [`Running`](AsyncGlueState::Running), and
-/// [`Completed`](AsyncGlueState::Completed). Call [`poll()`](Self::poll)
-/// every frame to check whether the spawned task has finished; when it has,
-/// the state transitions to `Completed` and the result becomes available.
-/// If the task was aborted (e.g. via [`JoinHandle::abort()`](tokio::task::JoinHandle::abort)),
-/// `poll()` transitions the state back to `Stopped` instead.
-///
-/// When the task finishes it automatically requests a repaint of the
-/// associated viewport through its [`AsyncGlueWaker`], so the UI is
-/// guaranteed to run at least one more frame to observe the result.
-///
-/// Manual state changes through [`start()`](Self::start) and
-/// [`take_state()`](Self::take_state) also request wake-ups by default.
-/// This can be configured via
-/// [`set_wake_up_on_manual_state_change()`](Self::set_wake_up_on_manual_state_change).
-///
-/// `T` is the output type of the spawned future. `A` controls how the
-/// Tokio runtime is accessed: the default [`AsyncGlueCurrentRuntime`] uses
-/// the thread-local runtime context (set by
-/// [`Runtime::enter()`](tokio::runtime::Runtime::enter)), while passing a
-/// [`Handle`] stores it inside the `AsyncGlue` so
-/// it works on threads where the runtime context is not available.
-///
-/// Derefs to [`AsyncGlueState<T>`] so you can pattern-match directly on an
-/// `AsyncGlue` value.
-///
-/// # Drop behaviour
-///
-/// Dropping an `AsyncGlue` whose task is still running will abort the task,
-/// block until it finishes, and discard the result. The Tokio runtime
-/// **must** still be alive at that point; otherwise the process will abort.
-/// To avoid this abort-and-wait-on-drop behaviour, call
-/// [`take_state()`](Self::take_state) first and take ownership of the returned
-/// [`AsyncGlueState::Running`]([`JoinHandle`](tokio::task::JoinHandle)),
-/// then decide its lifecycle yourself (for example: drop it, abort it, or await it).
-///
-/// If the spawned future panicked and the panic was never observed through
-/// [`poll()`](Self::poll), the drop implementation re-raises it with
-/// [`resume_unwind`]. If the `AsyncGlue` itself
-/// is being dropped during unwinding (e.g. due to another panic), this
-/// causes a double panic and the process aborts.
-pub struct AsyncGlue<T = (), A = AsyncGlueCurrentRuntime>
-where
-    T: 'static + Send,
-    A: AsyncGlueRuntime,
-{
-    state: AsyncGlueState<T>,
-    waker: AsyncGlueWaker,
-    task_is_finishing: Arc<AtomicBool>,
-    wake_up_on_manual_state_change: bool,
-    runtime: A,
-}
-
-/// The lifecycle state of an [`AsyncGlue`] task.
-#[derive(Debug)]
-pub enum AsyncGlueState<T>
-where
-    T: 'static + Send,
-{
-    /// No task is running. This is the initial state, and the state after a
-    /// task is aborted.
-    Stopped,
-    /// A task is running. The [`JoinHandle`] can be used to abort it.
-    Running(JoinHandle<T>),
-    /// The task finished and produced a value.
-    Completed(T),
-}
+use single::AsyncCall;
 
 /// Represents a single GUI viewport (window) that can be woken up from
 /// asynchronous tasks.
 ///
-/// An `AsyncGlueViewport` owns a wake-up callback (typically one that
-/// requests a repaint of the viewport) and hands out [`AsyncGlueWaker`]
+/// An `AsyncViewport` owns a wake-up callback (typically one that
+/// requests a repaint of the viewport) and hands out [`AsyncWaker`]
 /// handles via [`new_waker()`](Self::new_waker).
 ///
 /// The wake-up callback **must not block**, because it may be called from
 /// inside an async executor.
 #[derive(Clone)]
-pub struct AsyncGlueViewport {
+pub struct AsyncViewport {
     wake_up_requested: Arc<AtomicBool>,
-    wake_up: Arc<AsyncGlueWakeUpSlot>,
+    wake_up: Arc<AsyncWakeUpSlot>,
 }
 
-/// A thread-safe collection of [`AsyncGlueWaker`]s that can all be woken up
+/// A thread-safe collection of [`AsyncWaker`]s that can all be woken up
 /// at once.
 ///
 /// This is primarily used by synchronisation primitives (e.g.
 /// [`crate::sync::watch`]) that need to notify every viewport observing the same
 /// shared value.
 #[derive(Clone)]
-pub struct AsyncGlueWakerList {
-    inner: Arc<RwLock<AsyncGlueWakerListInner>>,
+pub struct AsyncWakerList {
+    inner: Arc<RwLock<AsyncWakerListInner>>,
 }
 
-struct AsyncGlueWakerListInner {
-    wakers: Vec<Option<AsyncGlueWaker>>,
+struct AsyncWakerListInner {
+    wakers: Vec<Option<AsyncWaker>>,
     free: Vec<usize>,
 }
 
 /// A lightweight, cloneable handle that can request a repaint of the
-/// [`AsyncGlueViewport`] it was created from.
+/// [`AsyncViewport`] it was created from.
 ///
-/// If the viewport has been dropped, [`AsyncGlueWakeUp::wake_up`]
+/// If the viewport has been dropped, [`AsyncWakeUp::wake_up`]
 /// becomes a no-op and returns `false`.
 #[derive(Clone)]
-pub struct AsyncGlueWaker {
+pub struct AsyncWaker {
     wake_up_requested: Arc<AtomicBool>,
-    wake_up: Weak<AsyncGlueWakeUpSlot>,
+    wake_up: Weak<AsyncWakeUpSlot>,
 }
 
-type AsyncGlueWakeUpSlot = RwLock<Option<AsyncGlueWakeUpCallback>>;
-pub type AsyncGlueWakeUpCallback = Arc<dyn Fn() + Send + Sync>;
-
-struct AsyncGlueTask<Fut>
-where
-    Fut: Future,
-{
-    // Make sure that task future is dropped before wake-up notification is sent.
-    // This minimizes the possibility of UI loop being woken up when JoinHandle::is_finished()
-    // is still false.
-    future: Fut,
-    _wake_up_guard: AsyncGlueWakeUpGuard<AsyncGlueTaskFinishNotifier>,
-}
+type AsyncWakeUpSlot = RwLock<Option<AsyncWakeUpCallback>>;
+pub type AsyncWakeUpCallback = Arc<dyn Fn() + Send + Sync>;
 
 /// RAII guard that wakes up on drop.
-pub struct AsyncGlueWakeUpGuard<W>
+pub struct AsyncWakeUpGuard<W>
 where
-    W: AsyncGlueWakeUp,
+    W: AsyncWakeUp,
 {
     waker: W,
 }
 
-struct AsyncGlueTaskFinishNotifier {
-    task_is_finishing: Arc<AtomicBool>,
-    waker: AsyncGlueWaker,
-}
-
 /// Common interface for types that can request a viewport wake-up.
-pub trait AsyncGlueWakeUp {
-    /// Creates a guard that calls [`AsyncGlueWakeUp::wake_up`] when dropped.
+pub trait AsyncWakeUp {
+    /// Creates a guard that calls [`AsyncWakeUp::wake_up`] when dropped.
     #[must_use]
-    fn wake_up_guard(&self) -> AsyncGlueWakeUpGuard<&Self>
+    fn wake_up_guard(&self) -> AsyncWakeUpGuard<&Self>
     where
         Self: Sized,
     {
-        AsyncGlueWakeUpGuard { waker: self }
+        AsyncWakeUpGuard { waker: self }
     }
 
     #[must_use]
-    fn wake_up_guard_owned(self) -> AsyncGlueWakeUpGuard<Self>
+    fn wake_up_guard_owned(self) -> AsyncWakeUpGuard<Self>
     where
         Self: Sized,
     {
-        AsyncGlueWakeUpGuard { waker: self }
+        AsyncWakeUpGuard { waker: self }
     }
 
     /// Requests a wake-up.
     fn wake_up(&self);
 }
 
-/// Abstraction over how [`AsyncGlue`] accesses a Tokio runtime.
+/// Abstraction over how [`AsyncCall`] accesses a Tokio runtime.
 ///
-/// Implemented for [`AsyncGlueCurrentRuntime`] (thread-local context) and
-/// [`Handle`] (explicit handle stored inside `AsyncGlue`).
-pub trait AsyncGlueRuntime {
+/// Implemented for [`AsyncCurrentRuntime`] (thread-local context) and
+/// [`Handle`] (explicit handle stored inside `AsyncCall`).
+pub trait AsyncRuntime {
     /// Spawns a future onto the runtime, returning a [`JoinHandle`].
     fn spawn<Fut, T>(&mut self, future: Fut) -> JoinHandle<T>
     where
@@ -232,7 +145,7 @@ pub trait AsyncGlueRuntime {
         T: 'static + Send;
 }
 
-/// The default [`AsyncGlueRuntime`] for [`AsyncGlue`].
+/// The default [`AsyncRuntime`] for [`AsyncCall`].
 ///
 /// Uses the Tokio runtime entered on the current thread (i.e. the one set
 /// up by [`Runtime::enter()`](tokio::runtime::Runtime::enter)). This is
@@ -241,215 +154,9 @@ pub trait AsyncGlueRuntime {
 /// a different thread). In that case, pass a
 /// [`Handle`] explicitly instead.
 #[derive(Default)]
-pub struct AsyncGlueCurrentRuntime;
+pub struct AsyncCurrentRuntime;
 
-impl<T, A> Drop for AsyncGlue<T, A>
-where
-    T: 'static + Send,
-    A: AsyncGlueRuntime,
-{
-    fn drop(&mut self) {
-        if let AsyncGlueState::Running(join_handle) =
-            replace(&mut self.state, AsyncGlueState::Stopped)
-        {
-            join_handle.abort();
-
-            // This will abort the whole process if already unwinding and spawned future panicked.
-            // This will abort the whole process if already unwinding and runtime already stopped.
-            self.runtime.block_on(join_handle);
-        }
-    }
-}
-
-impl<T, A, U> AsRef<U> for AsyncGlue<T, A>
-where
-    T: 'static + Send,
-    A: AsyncGlueRuntime,
-    <Self as Deref>::Target: AsRef<U>,
-{
-    fn as_ref(&self) -> &U {
-        self.deref().as_ref()
-    }
-}
-
-impl<T, A> Deref for AsyncGlue<T, A>
-where
-    T: 'static + Send,
-    A: AsyncGlueRuntime,
-{
-    type Target = AsyncGlueState<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.state
-    }
-}
-
-impl<T, A> AsyncGlue<T, A>
-where
-    T: 'static + Send,
-    A: Default + AsyncGlueRuntime,
-{
-    /// Creates a new `AsyncGlue` in the [`Stopped`](AsyncGlueState::Stopped)
-    /// state, using `A::default()` as the runtime.
-    #[must_use]
-    pub fn new(waker: AsyncGlueWaker) -> Self {
-        Self::new_with_runtime(waker, A::default())
-    }
-}
-
-impl<T, A> AsyncGlue<T, A>
-where
-    T: 'static + Send,
-    A: AsyncGlueRuntime,
-{
-    /// Creates a new `AsyncGlue` in the [`Stopped`](AsyncGlueState::Stopped)
-    /// state with an explicit runtime.
-    #[must_use]
-    pub fn new_with_runtime(waker: AsyncGlueWaker, runtime: A) -> Self {
-        Self {
-            state: AsyncGlueState::Stopped,
-            waker,
-            task_is_finishing: Arc::new(AtomicBool::new(false)),
-            wake_up_on_manual_state_change: true,
-            runtime,
-        }
-    }
-
-    /// Spawns `future` on the runtime and moves the state to
-    /// [`Running`](AsyncGlueState::Running).
-    ///
-    /// If [`wake_up_on_manual_state_change`](Self::wake_up_on_manual_state_change)
-    /// is enabled (default), this requests a wake-up immediately after the
-    /// state transition.
-    ///
-    /// Returns the **previous** state. If a task was already running, the
-    /// caller is responsible for deciding what to do with the old
-    /// [`JoinHandle`] (e.g. abort it).
-    #[must_use]
-    pub fn start<Fut>(&mut self, future: Fut) -> AsyncGlueState<T>
-    where
-        Fut: 'static + Send + Future<Output = T>,
-    {
-        if self.wake_up_on_manual_state_change {
-            self.waker.wake_up();
-        }
-
-        self.task_is_finishing = Arc::new(AtomicBool::new(false));
-        let wake_up_guard = AsyncGlueTaskFinishNotifier {
-            task_is_finishing: self.task_is_finishing.clone(),
-            waker: self.waker.clone(),
-        }
-        .wake_up_guard_owned();
-
-        let task = AsyncGlueTask {
-            future,
-            _wake_up_guard: wake_up_guard,
-        };
-        replace(
-            &mut self.state,
-            AsyncGlueState::Running(self.runtime.spawn(task)),
-        )
-    }
-
-    /// Takes the current state, leaving [`Stopped`](AsyncGlueState::Stopped)
-    /// in its place.
-    ///
-    /// If [`wake_up_on_manual_state_change`](Self::wake_up_on_manual_state_change)
-    /// is enabled (default), this requests a wake-up immediately after the
-    /// state transition.
-    #[must_use]
-    pub fn take_state(&mut self) -> AsyncGlueState<T> {
-        if self.wake_up_on_manual_state_change {
-            self.waker.wake_up();
-        }
-
-        replace(&mut self.state, AsyncGlueState::Stopped)
-    }
-
-    /// Returns whether manual state changes should trigger wake-ups.
-    ///
-    /// When enabled, [`start()`](Self::start) and [`take_state()`](Self::take_state)
-    /// call [`AsyncGlueWakeUp::wake_up`] on this glue's waker after changing
-    /// state.
-    #[must_use]
-    pub fn wake_up_on_manual_state_change(&self) -> bool {
-        self.wake_up_on_manual_state_change
-    }
-
-    /// Enables or disables wake-ups triggered by manual state changes.
-    ///
-    /// This affects [`start()`](Self::start) and [`take_state()`](Self::take_state).
-    pub fn set_wake_up_on_manual_state_change(&mut self, wake_up_on_manual_state_change: bool) {
-        self.wake_up_on_manual_state_change = wake_up_on_manual_state_change;
-    }
-
-    /// Checks whether the running task has finished and, if so, collects
-    /// its result.
-    ///
-    /// Returns `true` if a state transition occurred (to
-    /// [`Completed`](AsyncGlueState::Completed) on success, or back to
-    /// [`Stopped`](AsyncGlueState::Stopped) if the task was aborted).
-    /// Returns `false` if the task is still running or no task has been started.
-    ///
-    /// Call this once per frame, before inspecting the state.
-    pub fn poll(&mut self) -> bool {
-        if let AsyncGlueState::Running(join_handle) = &self.state {
-            if !self.task_is_finishing.load(Ordering::Acquire) {
-                return false;
-            }
-
-            if !join_handle.is_finished() {
-                // Tokio runtime is still working with finishing task, will need another redraw.
-                self.waker.wake_up();
-                return false;
-            }
-
-            let AsyncGlueState::Running(join_handle) =
-                replace(&mut self.state, AsyncGlueState::Stopped)
-            else {
-                unsafe {
-                    // SAFETY: We already checked that state is `AsyncGlueState::Running`.
-                    unreachable_unchecked()
-                }
-            };
-
-            if let Some(value) = self.runtime.block_on(join_handle) {
-                self.state = AsyncGlueState::Completed(value);
-            }
-            // Do nothing if task was aborted: state was already changed to
-            // `AsyncGlueState::Stopped` above.
-
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl<T> AsyncGlueState<T>
-where
-    T: 'static + Send,
-{
-    /// Returns `true` if the state is [`Stopped`](Self::Stopped).
-    #[must_use]
-    pub fn is_stopped(&self) -> bool {
-        matches!(self, AsyncGlueState::Stopped)
-    }
-
-    /// Returns `true` if the state is [`Running`](Self::Running).
-    #[must_use]
-    pub fn is_running(&self) -> bool {
-        matches!(self, AsyncGlueState::Running(_))
-    }
-
-    /// Returns `true` if the state is [`Completed`](Self::Completed).
-    #[must_use]
-    pub fn is_completed(&self) -> bool {
-        matches!(self, AsyncGlueState::Completed(_))
-    }
-}
-
-impl Default for AsyncGlueViewport {
+impl Default for AsyncViewport {
     fn default() -> Self {
         Self {
             wake_up_requested: Arc::new(AtomicBool::new(false)),
@@ -458,7 +165,7 @@ impl Default for AsyncGlueViewport {
     }
 }
 
-impl AsyncGlueWakeUp for AsyncGlueViewport {
+impl AsyncWakeUp for AsyncViewport {
     fn wake_up(&self) {
         if self
             .wake_up_requested
@@ -468,7 +175,7 @@ impl AsyncGlueWakeUp for AsyncGlueViewport {
             let wake_up = self
                 .wake_up
                 .read()
-                .expect("Failed to read-lock AsyncGlueViewport callback: poisoned by panic")
+                .expect("Failed to read-lock AsyncViewport callback: poisoned by panic")
                 .clone();
             if let Some(wake_up) = wake_up {
                 (wake_up)();
@@ -477,14 +184,14 @@ impl AsyncGlueWakeUp for AsyncGlueViewport {
     }
 }
 
-impl AsyncGlueViewport {
+impl AsyncViewport {
     /// Creates a new viewport with the given wake-up callback.
     ///
     /// `wake_up` is called whenever an async task associated with this
     /// viewport finishes or a synchronisation primitive is updated. It
     /// **must not block**.
     #[must_use]
-    pub fn new_with_wake_up(wake_up: AsyncGlueWakeUpCallback) -> Self {
+    pub fn new_with_wake_up(wake_up: AsyncWakeUpCallback) -> Self {
         let viewport = Self::default();
         let _ = viewport.replace_wake_up(Some(wake_up));
         viewport
@@ -499,44 +206,44 @@ impl AsyncGlueViewport {
     #[must_use]
     pub fn replace_wake_up(
         &self,
-        wake_up: Option<AsyncGlueWakeUpCallback>,
-    ) -> Option<AsyncGlueWakeUpCallback> {
+        wake_up: Option<AsyncWakeUpCallback>,
+    ) -> Option<AsyncWakeUpCallback> {
         replace(
             &mut *self
                 .wake_up
                 .write()
-                .expect("Failed to write-lock AsyncGlueViewport callback: poisoned by panic"),
+                .expect("Failed to write-lock AsyncViewport callback: poisoned by panic"),
             wake_up,
         )
     }
 
-    /// Creates an [`AsyncGlue`] wired to this viewport, using `A::default()`
+    /// Creates an [`AsyncCall`] wired to this viewport, using `A::default()`
     /// as the runtime.
     #[must_use]
-    pub fn new_glue<T, A>(&self) -> AsyncGlue<T, A>
+    pub fn new_call<T, A>(&self) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: Default + AsyncGlueRuntime,
+        A: Default + AsyncRuntime,
     {
-        AsyncGlue::new(self.new_waker())
+        AsyncCall::new(self.new_waker())
     }
 
-    /// Creates an [`AsyncGlue`] wired to this viewport with an explicit
+    /// Creates an [`AsyncCall`] wired to this viewport with an explicit
     /// runtime.
     #[must_use]
-    pub fn new_glue_with_runtime<T, A>(&self, runtime: A) -> AsyncGlue<T, A>
+    pub fn new_call_with_runtime<T, A>(&self, runtime: A) -> AsyncCall<T, A>
     where
         T: 'static + Send,
-        A: AsyncGlueRuntime,
+        A: AsyncRuntime,
     {
-        AsyncGlue::new_with_runtime(self.new_waker(), runtime)
+        AsyncCall::new_with_runtime(self.new_waker(), runtime)
     }
 
-    /// Creates a new [`AsyncGlueWaker`] that can request a repaint of this
+    /// Creates a new [`AsyncWaker`] that can request a repaint of this
     /// viewport.
     #[must_use]
-    pub fn new_waker(&self) -> AsyncGlueWaker {
-        AsyncGlueWaker {
+    pub fn new_waker(&self) -> AsyncWaker {
+        AsyncWaker {
             wake_up_requested: self.wake_up_requested.clone(),
             wake_up: Arc::downgrade(&self.wake_up),
         }
@@ -546,7 +253,7 @@ impl AsyncGlueViewport {
     /// request, clearing the pending flag.
     ///
     /// Call this at the start of every frame (before polling any
-    /// [`AsyncGlue`] instances) so that subsequent wake-up requests are not
+    /// [`AsyncCall`] instances) so that subsequent wake-up requests are not
     /// swallowed.
     pub fn woke_up(&self) {
         self.wake_up_requested.store(false, Ordering::Relaxed);
@@ -559,13 +266,13 @@ impl AsyncGlueViewport {
     }
 }
 
-impl Default for AsyncGlueWakerList {
+impl Default for AsyncWakerList {
     fn default() -> Self {
         Self::with_capacity(1)
     }
 }
 
-impl AsyncGlueWakeUp for AsyncGlueWakerList {
+impl AsyncWakeUp for AsyncWakerList {
     fn wake_up(&self) {
         for waker in self.inner().wakers.iter().flatten() {
             waker.wake_up();
@@ -573,12 +280,12 @@ impl AsyncGlueWakeUp for AsyncGlueWakerList {
     }
 }
 
-impl AsyncGlueWakerList {
+impl AsyncWakerList {
     /// Creates a new waker list pre-allocated for `capacity` wakers.
     #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            inner: Arc::new(RwLock::new(AsyncGlueWakerListInner {
+            inner: Arc::new(RwLock::new(AsyncWakerListInner {
                 wakers: Vec::with_capacity(capacity),
                 free: Vec::with_capacity(capacity),
             })),
@@ -591,7 +298,7 @@ impl AsyncGlueWakerList {
     /// [`remove_waker()`](Self::remove_waker) exactly once when the waker is
     /// no longer needed.
     #[must_use]
-    pub fn add_waker(&self, waker: AsyncGlueWaker) -> usize {
+    pub fn add_waker(&self, waker: AsyncWaker) -> usize {
         let mut inner = self.inner_mut();
         if let Some(idx) = inner.free.pop() {
             let place = unsafe {
@@ -619,27 +326,27 @@ impl AsyncGlueWakerList {
     pub unsafe fn remove_waker(&self, idx: usize) {
         let mut inner = self.inner_mut();
         let place = unsafe {
-            // SAFETY: This is safe because `idx` is a valid index returned by `AsyncGlueWakerList::add_waker()`.
+            // SAFETY: This is safe because `idx` is a valid index returned by `AsyncWakerList::add_waker()`.
             inner.wakers.get_unchecked_mut(idx)
         };
         *place = None;
         inner.free.push(idx);
     }
 
-    fn inner(&'_ self) -> RwLockReadGuard<'_, AsyncGlueWakerListInner> {
+    fn inner(&'_ self) -> RwLockReadGuard<'_, AsyncWakerListInner> {
         self.inner
             .read()
-            .expect("Failed to read-lock AsyncGlueWakerList: poisoned by panic in another thread")
+            .expect("Failed to read-lock AsyncWakerList: poisoned by panic in another thread")
     }
 
-    fn inner_mut(&'_ self) -> RwLockWriteGuard<'_, AsyncGlueWakerListInner> {
+    fn inner_mut(&'_ self) -> RwLockWriteGuard<'_, AsyncWakerListInner> {
         self.inner
             .write()
-            .expect("Failed to write-lock AsyncGlueWakerList: poisoned by panic in another thread")
+            .expect("Failed to write-lock AsyncWakerList: poisoned by panic in another thread")
     }
 }
 
-impl AsyncGlueWakeUp for AsyncGlueWaker {
+impl AsyncWakeUp for AsyncWaker {
     fn wake_up(&self) {
         if self
             .wake_up_requested
@@ -649,7 +356,7 @@ impl AsyncGlueWakeUp for AsyncGlueWaker {
             if let Some(wake_up) = self.wake_up.upgrade() {
                 let wake_up = wake_up
                     .read()
-                    .expect("Failed to read-lock AsyncGlueWaker callback: poisoned by panic")
+                    .expect("Failed to read-lock AsyncWaker callback: poisoned by panic")
                     .clone();
                 if let Some(wake_up) = wake_up {
                     (wake_up)();
@@ -661,8 +368,8 @@ impl AsyncGlueWakeUp for AsyncGlueWaker {
     }
 }
 
-impl AsyncGlueWaker {
-    /// Returns `true` if the owning [`AsyncGlueViewport`] is still alive.
+impl AsyncWaker {
+    /// Returns `true` if the owning [`AsyncViewport`] is still alive.
     #[must_use]
     pub fn is_alive(&self) -> bool {
         self.wake_up.strong_count() > 0
@@ -675,26 +382,9 @@ impl AsyncGlueWaker {
     }
 }
 
-impl<Fut> Future for AsyncGlueTask<Fut>
+impl<W> Deref for AsyncWakeUpGuard<W>
 where
-    Fut: Future,
-{
-    type Output = Fut::Output;
-
-    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        unsafe {
-            // SAFETY: Once `AsyncGlueTask` is pinned by the executor, `future` will not be moved
-            // anywhere. We only create a pinned projection to poll it in place.
-            let this = self.as_mut().get_unchecked_mut();
-            Pin::new_unchecked(&mut this.future)
-        }
-        .poll(context)
-    }
-}
-
-impl<W> Deref for AsyncGlueWakeUpGuard<W>
-where
-    W: AsyncGlueWakeUp,
+    W: AsyncWakeUp,
 {
     type Target = W;
 
@@ -703,9 +393,9 @@ where
     }
 }
 
-impl<W, T> AsRef<T> for AsyncGlueWakeUpGuard<W>
+impl<W, T> AsRef<T> for AsyncWakeUpGuard<W>
 where
-    W: AsyncGlueWakeUp,
+    W: AsyncWakeUp,
     <Self as Deref>::Target: AsRef<T>,
 {
     fn as_ref(&self) -> &T {
@@ -713,32 +403,25 @@ where
     }
 }
 
-impl<W> Drop for AsyncGlueWakeUpGuard<W>
+impl<W> Drop for AsyncWakeUpGuard<W>
 where
-    W: AsyncGlueWakeUp,
+    W: AsyncWakeUp,
 {
     fn drop(&mut self) {
         self.waker.wake_up();
     }
 }
 
-impl AsyncGlueWakeUp for AsyncGlueTaskFinishNotifier {
-    fn wake_up(&self) {
-        self.task_is_finishing.store(true, Ordering::Release);
-        self.waker.wake_up();
-    }
-}
-
-impl<T> AsyncGlueWakeUp for &T
+impl<T> AsyncWakeUp for &T
 where
-    T: AsyncGlueWakeUp,
+    T: AsyncWakeUp,
 {
     fn wake_up(&self) {
         (*self).wake_up();
     }
 }
 
-impl AsyncGlueRuntime for AsyncGlueCurrentRuntime {
+impl AsyncRuntime for AsyncCurrentRuntime {
     fn spawn<Fut, T>(&mut self, future: Fut) -> JoinHandle<T>
     where
         Fut: 'static + Send + Future<Output = T>,
@@ -765,7 +448,7 @@ impl AsyncGlueRuntime for AsyncGlueCurrentRuntime {
     }
 }
 
-impl AsyncGlueRuntime for Handle {
+impl AsyncRuntime for Handle {
     fn spawn<Fut, T>(&mut self, future: Fut) -> JoinHandle<T>
     where
         Fut: 'static + Send + Future<Output = T>,
