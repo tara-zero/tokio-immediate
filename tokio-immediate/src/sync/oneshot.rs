@@ -8,15 +8,15 @@ use ::std::task::{Context, Poll};
 use ::tokio::sync::oneshot;
 
 use crate::sync::waker_binding::WakerBinding;
-use crate::{AsyncGlueWakeUp, AsyncGlueWaker};
+use crate::{AsyncWakeUp, AsyncWaker};
 
 /// Creates a new oneshot channel, returning a [`Sender`] and a [`Receiver`]
-/// that is already bound to the given [`AsyncGlueWaker`].
+/// that is already bound to the given [`AsyncWaker`].
 ///
 /// The receiver's viewport will be woken up whenever a value is sent through
 /// [`Sender::im_send`] successfully.
 #[must_use]
-pub fn channel_with_waker<T>(waker: AsyncGlueWaker) -> (Sender<T>, Receiver<T>) {
+pub fn channel_with_waker<T>(waker: AsyncWaker) -> (Sender<T>, Receiver<T>) {
     let (sender, receiver) = oneshot::channel();
     let binding = WakerBinding::default();
     binding.set_waker(waker);
@@ -105,7 +105,7 @@ impl<T> DerefMut for Sender<T> {
     }
 }
 
-impl<T> AsyncGlueWakeUp for Sender<T> {
+impl<T> AsyncWakeUp for Sender<T> {
     fn wake_up(&self) {
         self.binding.wake_up();
     }
@@ -164,7 +164,7 @@ impl<T> Receiver<T> {
     ///
     /// Future successful [`Sender::im_send`] calls will request a wake-up of
     /// this viewport.
-    pub fn im_set_waker(&self, waker: AsyncGlueWaker) {
+    pub fn im_set_waker(&self, waker: AsyncWaker) {
         self.binding.set_waker(waker);
     }
 

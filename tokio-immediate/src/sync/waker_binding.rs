@@ -2,15 +2,15 @@
 
 use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::{AsyncGlueWakeUp, AsyncGlueWaker};
+use crate::{AsyncWakeUp, AsyncWaker};
 
 #[derive(Clone, Default)]
 pub(super) struct WakerBinding {
-    waker: Arc<RwLock<Option<AsyncGlueWaker>>>,
+    waker: Arc<RwLock<Option<AsyncWaker>>>,
 }
 
 impl WakerBinding {
-    pub(super) fn set_waker(&self, waker: AsyncGlueWaker) {
+    pub(super) fn set_waker(&self, waker: AsyncWaker) {
         *self.waker_mut() = Some(waker);
     }
 
@@ -24,13 +24,13 @@ impl WakerBinding {
         }
     }
 
-    fn waker(&'_ self) -> RwLockReadGuard<'_, Option<AsyncGlueWaker>> {
+    fn waker(&'_ self) -> RwLockReadGuard<'_, Option<AsyncWaker>> {
         self.waker
             .read()
             .expect("Failed to read-lock sync waker binding: poisoned by panic in another thread")
     }
 
-    fn waker_mut(&'_ self) -> RwLockWriteGuard<'_, Option<AsyncGlueWaker>> {
+    fn waker_mut(&'_ self) -> RwLockWriteGuard<'_, Option<AsyncWaker>> {
         self.waker
             .write()
             .expect("Failed to write-lock sync waker binding: poisoned by panic in another thread")

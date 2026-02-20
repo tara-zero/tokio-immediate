@@ -9,7 +9,7 @@ const SHORT_TIMEOUT: Duration = Duration::from_millis(50);
 
 #[test]
 fn subscribe_creates_initially_triggered_trigger() {
-    let handle = trigger::AsyncGlueTriggerHandle::default();
+    let handle = trigger::AsyncTriggerHandle::default();
     let trigger = handle.subscribe();
     assert!(trigger.has_triggered());
 }

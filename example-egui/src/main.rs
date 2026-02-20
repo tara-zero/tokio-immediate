@@ -16,10 +16,11 @@ use ::egui::{
     UiBuilder, Vec2, ViewportBuilder, ViewportClass, ViewportId,
 };
 use ::futures_util::StreamExt as _;
+use ::tokio_immediate_egui::single::{AsyncCall, AsyncCallState};
 use ::tokio_immediate_egui::sync::watch;
 use ::tokio_immediate_egui::tokio::runtime::{Handle, Runtime};
-use ::tokio_immediate_egui::trigger::AsyncGlueTrigger;
-use ::tokio_immediate_egui::{AsyncGlue, AsyncGlueState, AsyncGlueWaker, EguiAsync};
+use ::tokio_immediate_egui::trigger::AsyncTrigger;
+use ::tokio_immediate_egui::{AsyncWaker, EguiAsync};
 use ::tokio_util::sync::CancellationToken;
 
 const APP_NAME: &str = "egui + tokio-immediate";
@@ -50,11 +51,11 @@ struct ExampleApp {
 
     str_a: String,
     str_b: String,
-    async_concat: AsyncGlue<String>,
+    async_concat: AsyncCall<String>,
 
     url: String,
     download: DownloadInner,
-    async_download: AsyncGlue<DownloadResult>,
+    async_download: AsyncCall<DownloadResult>,
 }
 
 struct SecondWindow {
@@ -62,7 +63,7 @@ struct SecondWindow {
 
     sender: watch::Sender<usize>,
     receiver: watch::Receiver<usize>,
-    async_counter: AsyncGlue<(), Handle>,
+    async_counter: AsyncCall<(), Handle>,
 }
 
 struct DownloadInner {
@@ -92,10 +93,10 @@ impl ExampleApp {
         let egui_async = EguiAsync::default();
         cc.egui_ctx.add_plugin(egui_async.plugin());
 
-        let async_concat = egui_async.new_glue_for_root();
+        let async_concat = egui_async.new_call_for_root();
 
         let download = DownloadInner::new(egui_async.new_waker_for_root());
-        let async_download = egui_async.new_glue_for_root();
+        let async_download = egui_async.new_call_for_root();
 
         Self {
             egui_async,
@@ -220,18 +221,18 @@ impl ExampleApp {
         }
 
         match &*self.async_concat {
-            AsyncGlueState::Stopped => {
+            AsyncCallState::Stopped => {
                 Self::ui_concat_result(ui, true, "");
             }
 
-            AsyncGlueState::Running(task) => {
+            AsyncCallState::Running(task) => {
                 let rect = Self::ui_concat_result(ui, true, "");
                 if Self::ui_waiting_with_abort(ui, rect, "Waiting...") {
                     task.abort();
                 }
             }
 
-            AsyncGlueState::Completed(value) => {
+            AsyncCallState::Completed(value) => {
                 Self::ui_concat_result(ui, false, value);
             }
         }
@@ -301,9 +302,9 @@ impl ExampleApp {
         }
 
         match &*self.async_download {
-            AsyncGlueState::Stopped => {}
+            AsyncCallState::Stopped => {}
 
-            AsyncGlueState::Running(task) => {
+            AsyncCallState::Running(task) => {
                 if let Some(progress) = self.download.receiver.borrow().as_ref() {
                     // Already have some download progress.
                     Self::ui_add_space(ui);
@@ -332,7 +333,7 @@ impl ExampleApp {
                 }
             }
 
-            AsyncGlueState::Completed(value) => {
+            AsyncCallState::Completed(value) => {
                 Self::ui_add_space(ui);
 
                 match value {
@@ -359,7 +360,7 @@ impl ExampleApp {
     async fn download(
         url: String,
         cancel: CancellationToken,
-        mut trigger: AsyncGlueTrigger,
+        mut trigger: AsyncTrigger,
         sender: watch::Sender<Option<DownloadProgress>>,
     ) -> Result<DownloadProgress, String> {
         let start = Instant::now();
@@ -440,7 +441,7 @@ impl SecondWindow {
 
             sender,
             receiver,
-            async_counter: egui_async.new_glue_with_runtime_for(runtime, viewport_id),
+            async_counter: egui_async.new_call_with_runtime_for(runtime, viewport_id),
         }
     }
 
@@ -488,7 +489,7 @@ impl SecondWindow {
 }
 
 impl DownloadInner {
-    fn new(waker: AsyncGlueWaker) -> Self {
+    fn new(waker: AsyncWaker) -> Self {
         let (sender, receiver) = watch::channel_with_waker(None, waker);
         Self {
             cancel: CancellationToken::new(),

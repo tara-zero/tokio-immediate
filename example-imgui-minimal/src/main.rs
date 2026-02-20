@@ -11,14 +11,15 @@ use ::dear_imgui_rs::{Condition, InputText, Ui, WindowFlags};
 use ::tokio::net::TcpSocket;
 use ::tokio::runtime::Runtime;
 use ::tokio::time::timeout;
-use ::tokio_immediate::{AsyncGlue, AsyncGlueState, AsyncGlueViewport, AsyncGlueWakeUp};
+use ::tokio_immediate::single::{AsyncCall, AsyncCallState};
+use ::tokio_immediate::{AsyncViewport, AsyncWakeUp};
 use ::winit::event::{Event, WindowEvent};
 
 fn main() {
     let runtime = Runtime::new().expect("Failed to create Tokio runtime");
     let _runtime_guard = runtime.enter();
 
-    let viewport = AsyncGlueViewport::default();
+    let viewport = AsyncViewport::default();
     let mut app = ExampleApp::new(viewport.clone());
 
     AppBuilder::new()
@@ -59,16 +60,16 @@ fn main() {
 
 struct ExampleApp {
     frame_n: usize,
-    viewport: AsyncGlueViewport,
+    viewport: AsyncViewport,
     addr_port: String,
-    tcping: AsyncGlue<Result<(), String>>,
+    tcping: AsyncCall<Result<(), String>>,
 }
 
 impl ExampleApp {
-    fn new(viewport: AsyncGlueViewport) -> Self {
+    fn new(viewport: AsyncViewport) -> Self {
         Self {
             frame_n: 0,
-            tcping: viewport.new_glue(),
+            tcping: viewport.new_call(),
             viewport,
             addr_port: String::from("127.0.0.1:22"),
         }
@@ -122,10 +123,10 @@ impl ExampleApp {
 
                 match &*self.tcping {
                     // Do not add any widgets when task was aborted or was never started.
-                    AsyncGlueState::Stopped => {}
+                    AsyncCallState::Stopped => {}
 
                     // Add "Waiting..." text and an "Abort" button when task is running.
-                    AsyncGlueState::Running(task) => {
+                    AsyncCallState::Running(task) => {
                         ui.text("Waiting...");
                         if ui.button("Abort") {
                             task.abort();
@@ -133,12 +134,12 @@ impl ExampleApp {
                     }
 
                     // Task completed, successfully.
-                    AsyncGlueState::Completed(Ok(())) => {
+                    AsyncCallState::Completed(Ok(())) => {
                         ui.text("Port is open!");
                     }
 
                     // Task completed, with an error.
-                    AsyncGlueState::Completed(Err(error)) => {
+                    AsyncCallState::Completed(Err(error)) => {
                         ui.text("TCPing failed:");
                         ui.text(error);
                     }

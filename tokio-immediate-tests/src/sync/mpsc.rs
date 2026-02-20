@@ -3,13 +3,13 @@
 use ::std::sync::Arc;
 use ::std::sync::atomic::{AtomicUsize, Ordering};
 
-use ::tokio_immediate::AsyncGlueViewport;
+use ::tokio_immediate::AsyncViewport;
 use ::tokio_immediate::sync::mpsc;
 
 #[tokio::test]
 async fn channel_with_waker_wakes_on_im_send() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -29,7 +29,7 @@ async fn channel_with_waker_wakes_on_im_send() {
 #[test]
 fn receiver_can_set_waker_after_channel_creation() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -55,7 +55,7 @@ fn receiver_can_set_waker_after_channel_creation() {
 #[test]
 fn receiver_can_clear_waker() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -81,7 +81,7 @@ fn receiver_can_clear_waker() {
 #[tokio::test]
 async fn unbounded_channel_with_waker_wakes_on_im_send() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -100,7 +100,7 @@ async fn unbounded_channel_with_waker_wakes_on_im_send() {
 #[test]
 fn unbounded_receiver_can_set_waker_after_channel_creation() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -126,7 +126,7 @@ fn unbounded_receiver_can_set_waker_after_channel_creation() {
 #[test]
 fn unbounded_receiver_can_clear_waker() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -152,7 +152,7 @@ fn unbounded_receiver_can_clear_waker() {
 #[test]
 fn unbounded_failed_send_does_not_wake() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -176,7 +176,7 @@ fn unbounded_failed_send_does_not_wake() {
 #[tokio::test]
 async fn weak_sender_upgrade_preserves_im_send_wake_behavior() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);
@@ -213,7 +213,7 @@ fn weak_sender_upgrade_fails_without_strong_senders() {
 #[tokio::test]
 async fn weak_unbounded_sender_upgrade_preserves_im_send_wake_behavior() {
     let wake_count = Arc::new(AtomicUsize::new(0));
-    let viewport = AsyncGlueViewport::new_with_wake_up({
+    let viewport = AsyncViewport::new_with_wake_up({
         let wake_count = wake_count.clone();
         Arc::new(move || {
             wake_count.fetch_add(1, Ordering::Relaxed);

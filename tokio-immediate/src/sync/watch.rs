@@ -5,15 +5,15 @@ use ::std::ops::{Deref, DerefMut};
 use ::tokio::sync::watch;
 
 use crate::sync::waker_registration::WakerRegistration;
-use crate::{AsyncGlueWakeUp, AsyncGlueWaker, AsyncGlueWakerList};
+use crate::{AsyncWakeUp, AsyncWaker, AsyncWakerList};
 
 /// Creates a new watch channel, returning a [`Sender`] and a [`Receiver`]
-/// that is already registered with the given [`AsyncGlueWaker`].
+/// that is already registered with the given [`AsyncWaker`].
 ///
 /// The receiver's viewport will be woken up whenever a value is sent
 /// through any of the `im_send*` methods on the sender.
 #[must_use]
-pub fn channel_with_waker<T>(init: T, waker: AsyncGlueWaker) -> (Sender<T>, Receiver<T>) {
+pub fn channel_with_waker<T>(init: T, waker: AsyncWaker) -> (Sender<T>, Receiver<T>) {
     let sender = Sender::new(init);
     let receiver = sender.im_subscribe_with_waker(waker);
 
@@ -42,7 +42,7 @@ pub fn channel<T>(init: T) -> (Sender<T>, Receiver<T>) {
 /// hold a registered [`Receiver`].
 pub struct Sender<T> {
     sender: watch::Sender<T>,
-    wakers: AsyncGlueWakerList,
+    wakers: AsyncWakerList,
 }
 
 /// The receiving half of a viewport-aware watch channel.
@@ -50,7 +50,7 @@ pub struct Sender<T> {
 /// Wraps a [`tokio::sync::watch::Receiver<T>`] and derefs to it, so the
 /// full Tokio API is available (e.g. [`borrow()`](tokio::sync::watch::Receiver::borrow)).
 ///
-/// A receiver optionally carries an [`AsyncGlueWaker`] that is registered
+/// A receiver optionally carries an [`AsyncWaker`] that is registered
 /// in the sender's waker list. Cloning a receiver via [`Clone`] produces a
 /// copy **without** a waker; use [`im_clone_with_waker()`](Self::im_clone_with_waker)
 /// to get a clone that wakes a specific viewport.
@@ -100,7 +100,7 @@ impl<T> DerefMut for Sender<T> {
     }
 }
 
-impl<T> AsyncGlueWakeUp for Sender<T> {
+impl<T> AsyncWakeUp for Sender<T> {
     fn wake_up(&self) {
         self.wakers.wake_up();
     }
@@ -113,7 +113,7 @@ impl<T> Sender<T> {
     pub fn new(init: T) -> Self {
         Self {
             sender: watch::Sender::new(init),
-            wakers: AsyncGlueWakerList::default(),
+            wakers: AsyncWakerList::default(),
         }
     }
 
@@ -160,9 +160,9 @@ impl<T> Sender<T> {
     }
 
     /// Creates a new [`Receiver`] subscribed to this sender, registered
-    /// with the given [`AsyncGlueWaker`].
+    /// with the given [`AsyncWaker`].
     #[must_use]
-    pub fn im_subscribe_with_waker(&self, waker: AsyncGlueWaker) -> Receiver<T> {
+    pub fn im_subscribe_with_waker(&self, waker: AsyncWaker) -> Receiver<T> {
         Receiver::new_with_waker(self.sender.subscribe(), self.wakers.clone(), waker)
     }
 
@@ -216,13 +216,13 @@ impl<T> DerefMut for Receiver<T> {
 }
 
 impl<T> Receiver<T> {
-    /// Clones this receiver and registers the given [`AsyncGlueWaker`] on
+    /// Clones this receiver and registers the given [`AsyncWaker`] on
     /// the new copy.
     ///
     /// Unlike [`Clone::clone()`], the returned receiver will wake its
     /// viewport when the sender uses an `im_send*` method.
     #[must_use]
-    pub fn im_clone_with_waker(&self, waker: AsyncGlueWaker) -> Self {
+    pub fn im_clone_with_waker(&self, waker: AsyncWaker) -> Self {
         Self {
             receiver: self.receiver.clone(),
             inner: self.inner.clone_with_waker(waker),
@@ -231,8 +231,8 @@ impl<T> Receiver<T> {
 
     fn new_with_waker(
         receiver: watch::Receiver<T>,
-        wakers: AsyncGlueWakerList,
-        waker: AsyncGlueWaker,
+        wakers: AsyncWakerList,
+        waker: AsyncWaker,
     ) -> Self {
         Self {
             receiver,
@@ -240,7 +240,7 @@ impl<T> Receiver<T> {
         }
     }
 
-    fn new(receiver: watch::Receiver<T>, wakers: AsyncGlueWakerList) -> Self {
+    fn new(receiver: watch::Receiver<T>, wakers: AsyncWakerList) -> Self {
         Self {
             receiver,
             inner: WakerRegistration::new(wakers),

@@ -34,25 +34,26 @@ streaming progress updates, and cancellation tokens.
 ## Simplified code (with egui-specific helper plugin)
 
 ```rust
-use tokio_immediate_egui::{AsyncGlue, AsyncGlueState, EguiAsync};
+use tokio_immediate_egui::single::{AsyncCall, AsyncCallState};
+use tokio_immediate_egui::EguiAsync;
 
 // During app setup - create an EguiAsync and register its plugin:
 let egui_async = EguiAsync::default();
 cc.egui_ctx.add_plugin(egui_async.plugin());
-let mut task: AsyncGlue<String> = egui_async.new_glue();
+let mut task: AsyncCall<String> = egui_async.new_call();
 
 // In your update() loop:
 task.poll(); // check for completion — call once per frame
 
 match &*task {
-    AsyncGlueState::Stopped => { /* never started or aborted */ }
-    AsyncGlueState::Running(handle) => {
+    AsyncCallState::Stopped => { /* never started or aborted */ }
+    AsyncCallState::Running(handle) => {
         ui.spinner();
         if ui.button("Abort").clicked() {
             handle.abort();
         }
     }
-    AsyncGlueState::Completed(value) => {
+    AsyncCallState::Completed(value) => {
         ui.label(value);
     }
 }
@@ -65,7 +66,7 @@ task.start(async {
 ```
 
 When the spawned future finishes, the library automatically requests a repaint of the viewport
-that owns the `AsyncGlue`, so you never miss the result.
+that owns the `AsyncCall`, so you never miss the result.
 
 ## Development
 
