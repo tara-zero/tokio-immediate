@@ -73,6 +73,30 @@ pub struct Receiver<T> {
     inner: WakerRegistration,
 }
 
+/// A non-blocking iterator over up to `n` values from a [`Receiver`].
+///
+/// Yields:
+/// - `Some(item)` when an item is available
+/// - `None` when the channel is disconnected
+///
+/// Iteration stops early without yielding when the channel is currently empty.
+pub struct ReceiverTake<'a, T> {
+    receiver: &'a mut broadcast::Receiver<T>,
+    remaining: usize,
+    emitted_closed: bool,
+}
+
+/// Non-empty receive errors for [`Receiver::im_take`] and
+/// [`Receiver::im_take_current`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TryRecvError {
+    /// The channel is closed and no further values are available.
+    Closed,
+
+    /// The receiver lagged too far behind and skipped `u64` messages.
+    Lagged(u64),
+}
+
 impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
         Self {
@@ -283,6 +307,34 @@ impl<T> Receiver<T> {
         }
     }
 
+    /// Creates a non-blocking iterator that yields at most `n` elements.
+    ///
+    /// The iterator uses [`try_recv()`](tokio::sync::broadcast::Receiver::try_recv):
+    /// it stops early when the channel is empty and yields
+    /// [`TryRecvError`] values for non-empty errors.
+    #[must_use]
+    pub fn im_take(&mut self, n: usize) -> ReceiverTake<'_, T>
+    where
+        T: Clone,
+    {
+        ReceiverTake {
+            receiver: &mut self.receiver,
+            remaining: n,
+            emitted_closed: false,
+        }
+    }
+
+    /// Creates a non-blocking iterator over currently buffered elements.
+    ///
+    /// Equivalent to `self.im_take(self.len())`.
+    #[must_use]
+    pub fn im_take_current(&mut self) -> ReceiverTake<'_, T>
+    where
+        T: Clone,
+    {
+        self.im_take(self.receiver.len())
+    }
+
     fn new_with_waker(
         receiver: broadcast::Receiver<T>,
         wakers: AsyncGlueWakerList,
@@ -298,6 +350,34 @@ impl<T> Receiver<T> {
         Self {
             receiver,
             inner: WakerRegistration::new(wakers),
+        }
+    }
+}
+
+impl<T> Iterator for ReceiverTake<'_, T>
+where
+    T: Clone,
+{
+    type Item = Result<T, TryRecvError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 || self.emitted_closed {
+            return None;
+        }
+
+        match self.receiver.try_recv() {
+            Ok(item) => {
+                self.remaining -= 1;
+                Some(Ok(item))
+            }
+            Err(broadcast::error::TryRecvError::Empty) => None,
+            Err(broadcast::error::TryRecvError::Closed) => {
+                self.emitted_closed = true;
+                Some(Err(TryRecvError::Closed))
+            }
+            Err(broadcast::error::TryRecvError::Lagged(count)) => {
+                Some(Err(TryRecvError::Lagged(count)))
+            }
         }
     }
 }
