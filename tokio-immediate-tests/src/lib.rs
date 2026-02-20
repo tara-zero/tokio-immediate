@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// TODO: Most of the tests are LLM-generated. Needs review.
+
 #[cfg(all(test, feature = "sync"))]
 mod sync;
 #[cfg(all(test, feature = "sync"))]
