@@ -39,12 +39,17 @@ pub use ::tokio_immediate::sync;
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use ::tokio_immediate::trigger;
 
+#[cfg(feature = "sync")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+pub use ::tokio_immediate::serial;
 pub use ::tokio_immediate::single;
 pub use ::tokio_immediate::{
     AsyncCurrentRuntime, AsyncRuntime, AsyncViewport, AsyncWakeUp, AsyncWakeUpCallback,
     AsyncWakeUpGuard, AsyncWaker, AsyncWakerList,
 };
 
+#[cfg(feature = "sync")]
+use ::tokio_immediate::serial::AsyncSerialRunner;
 use ::tokio_immediate::single::AsyncCall;
 
 /// Manages [`AsyncViewport`]s for all egui viewports via a [`Plugin`].
@@ -170,6 +175,91 @@ impl EguiAsync {
         A: AsyncRuntime,
     {
         AsyncCall::new_with_runtime(self.new_waker_for(viewport_id), runtime)
+    }
+
+    /// Creates an [`AsyncSerialRunner`] bound to the root viewport, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_for_root<T, A>(&self) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncSerialRunner::new(self.new_waker_for_root())
+    }
+
+    /// Creates an [`AsyncSerialRunner`] bound to the root viewport with an
+    /// explicit runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_with_runtime_for_root<T, A>(
+        &self,
+        runtime: A,
+    ) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncSerialRunner::new_with_runtime(self.new_waker_for_root(), runtime)
+    }
+
+    /// Creates an [`AsyncSerialRunner`] bound to the current viewport, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner<T, A>(&self) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncSerialRunner::new(self.new_waker())
+    }
+
+    /// Creates an [`AsyncSerialRunner`] bound to the current viewport with an
+    /// explicit runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_with_runtime<T, A>(&self, runtime: A) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncSerialRunner::new_with_runtime(self.new_waker(), runtime)
+    }
+
+    /// Creates an [`AsyncSerialRunner`] bound to `viewport_id`, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_for<T, A>(&self, viewport_id: ViewportId) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncSerialRunner::new(self.new_waker_for(viewport_id))
+    }
+
+    /// Creates an [`AsyncSerialRunner`] bound to `viewport_id` with an
+    /// explicit runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_with_runtime_for<T, A>(
+        &self,
+        runtime: A,
+        viewport_id: ViewportId,
+    ) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncSerialRunner::new_with_runtime(self.new_waker_for(viewport_id), runtime)
     }
 
     /// Creates an [`AsyncWaker`] for the root viewport.
@@ -381,6 +471,87 @@ impl EguiAsyncPlugin {
     {
         self.upgrade()
             .new_call_with_runtime_for(runtime, viewport_id)
+    }
+
+    /// See [`EguiAsync::new_serial_runner_for_root()`].
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_for_root<T, A>(&self) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        self.upgrade().new_serial_runner_for_root()
+    }
+
+    /// See [`EguiAsync::new_serial_runner_with_runtime_for_root()`].
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_with_runtime_for_root<T, A>(
+        &self,
+        runtime: A,
+    ) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        self.upgrade()
+            .new_serial_runner_with_runtime_for_root(runtime)
+    }
+
+    /// See [`EguiAsync::new_serial_runner()`].
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner<T, A>(&self) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        self.upgrade().new_serial_runner()
+    }
+
+    /// See [`EguiAsync::new_serial_runner_with_runtime()`].
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_with_runtime<T, A>(&self, runtime: A) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        self.upgrade().new_serial_runner_with_runtime(runtime)
+    }
+
+    /// See [`EguiAsync::new_serial_runner_for()`].
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_for<T, A>(&self, viewport_id: ViewportId) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        self.upgrade().new_serial_runner_for(viewport_id)
+    }
+
+    /// See [`EguiAsync::new_serial_runner_with_runtime_for()`].
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_with_runtime_for<T, A>(
+        &self,
+        runtime: A,
+        viewport_id: ViewportId,
+    ) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        self.upgrade()
+            .new_serial_runner_with_runtime_for(runtime, viewport_id)
     }
 
     /// See [`EguiAsync::new_waker_for_root()`].
