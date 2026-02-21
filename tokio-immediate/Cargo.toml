@@ -17,7 +17,8 @@ all-features = true
 [features]
 default = []
 
-## Enable viewport-aware wrappers around [`tokio::sync`] channels and a [`trigger`] notification channel.
+## Enable viewport-aware wrappers around [`tokio::sync`] channels, a [`trigger`] notification channel
+## and a [`serial::AsyncSerialRunner`].
 sync = ["tokio/sync"]
 
 # Describe feature flags in generated doc.

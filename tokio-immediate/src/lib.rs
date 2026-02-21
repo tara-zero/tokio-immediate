@@ -11,6 +11,8 @@
 //! With the `sync` feature enabled, the [`sync`] and [`trigger`] modules
 //! provide channel wrappers that wake viewports when values are sent,
 //! enabling continuous progress reporting from async tasks to the UI.
+//! The `serial` module is also enabled by that feature and provides
+//! `AsyncSerialRunner`.
 //!
 //! ## Feature flags
 #![cfg_attr(docsrs, feature(doc_cfg))]
@@ -35,6 +37,10 @@ use ::tokio::task::JoinHandle;
 /// Re-export `tokio` crate.
 pub use ::tokio;
 
+/// Async serial runner: schedule futures to run one after another.
+#[cfg(feature = "sync")]
+#[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+pub mod serial;
 /// Async call: spawn one [`Future`] and track its result.
 pub mod single;
 /// Wrappers around `tokio::sync` primitives that wake up viewports on send.
@@ -46,6 +52,8 @@ pub mod sync;
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub mod trigger;
 
+#[cfg(feature = "sync")]
+use serial::AsyncSerialRunner;
 use single::AsyncCall;
 
 /// Represents a single GUI viewport (window) that can be woken up from
@@ -237,6 +245,32 @@ impl AsyncViewport {
         A: AsyncRuntime,
     {
         AsyncCall::new_with_runtime(self.new_waker(), runtime)
+    }
+
+    /// Creates an [`AsyncSerialRunner`] wired to this viewport, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner<T, A>(&self) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncSerialRunner::new(self.new_waker())
+    }
+
+    /// Creates an [`AsyncSerialRunner`] wired to this viewport with an
+    /// explicit runtime.
+    #[must_use]
+    #[cfg(feature = "sync")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
+    pub fn new_serial_runner_with_runtime<T, A>(&self, runtime: A) -> AsyncSerialRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncSerialRunner::new_with_runtime(self.new_waker(), runtime)
     }
 
     /// Creates a new [`AsyncWaker`] that can request a repaint of this
