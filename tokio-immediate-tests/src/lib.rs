@@ -5,6 +5,8 @@
 #![warn(clippy::undocumented_unsafe_blocks)]
 
 #[cfg(test)]
+mod common;
+#[cfg(test)]
 mod parallel;
 #[cfg(all(test, feature = "sync"))]
 mod serial;

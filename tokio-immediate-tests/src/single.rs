@@ -3,12 +3,13 @@
 use ::core::future::pending;
 use ::std::sync::Arc;
 use ::std::sync::atomic::{AtomicUsize, Ordering};
-use ::std::thread::sleep as thread_sleep;
 use ::std::time::Duration;
 
 use ::tokio::runtime::Runtime;
 use ::tokio_immediate::AsyncViewport;
 use ::tokio_immediate::single::{AsyncCall, AsyncCallState};
+
+use crate::common::{WAIT_TIMEOUT, wait_until};
 
 #[test]
 fn poll_returns_false_for_stopped_state() {
@@ -35,12 +36,11 @@ fn start_and_poll_completes_task() {
     assert!(previous.is_stopped());
     assert!(call.is_running());
 
-    for _ in 0..50 {
-        if call.poll() {
-            break;
-        }
-        thread_sleep(Duration::from_millis(1));
-    }
+    wait_until(
+        || call.poll(),
+        WAIT_TIMEOUT,
+        "timed out waiting for AsyncCall completion",
+    );
 
     assert!(call.is_completed());
     match &*call {
@@ -72,13 +72,16 @@ fn aborted_task_transitions_back_to_stopped() {
         _ => panic!("state should be running after start"),
     }
 
-    for _ in 0..50 {
-        if call.poll() {
-            break;
-        }
-        thread_sleep(Duration::from_millis(1));
-    }
-    thread_sleep(Duration::from_millis(10));
+    wait_until(
+        || call.poll(),
+        WAIT_TIMEOUT,
+        "timed out waiting for aborted AsyncCall to settle",
+    );
+    wait_until(
+        || wake_count.load(Ordering::Relaxed) == 1,
+        WAIT_TIMEOUT,
+        "timed out waiting for aborted AsyncCall wake-up",
+    );
 
     assert!(call.is_stopped());
     assert_eq!(wake_count.load(Ordering::Relaxed), 1);
@@ -182,12 +185,11 @@ fn second_start_returns_previous_running_state() {
         _ => panic!("previous state should be running when starting second task"),
     }
 
-    for _ in 0..50 {
-        if call.poll() {
-            break;
-        }
-        thread_sleep(Duration::from_millis(1));
-    }
+    wait_until(
+        || call.poll(),
+        WAIT_TIMEOUT,
+        "timed out waiting for second AsyncCall start to complete",
+    );
 
     match &*call {
         AsyncCallState::Completed(value) => assert_eq!(*value, 9_u32),
@@ -217,12 +219,11 @@ fn future_is_dropped_before_finish_notifier_wake_up_on_normal_completion() {
         7_u32
     });
 
-    for _ in 0..50 {
-        if call.poll() {
-            break;
-        }
-        thread_sleep(Duration::from_millis(1));
-    }
+    wait_until(
+        || call.poll(),
+        WAIT_TIMEOUT,
+        "timed out waiting for AsyncCall completion and drop ordering check",
+    );
 
     assert!(call.is_completed());
     assert_eq!(steps.load(Ordering::Relaxed), 2);
@@ -255,12 +256,11 @@ fn future_is_dropped_before_finish_notifier_wake_up_when_task_is_aborted() {
         _ => panic!("state should be running after start"),
     }
 
-    for _ in 0..50 {
-        if call.poll() {
-            break;
-        }
-        thread_sleep(Duration::from_millis(1));
-    }
+    wait_until(
+        || call.poll(),
+        WAIT_TIMEOUT,
+        "timed out waiting for aborted AsyncCall drop ordering check",
+    );
 
     assert!(call.is_stopped());
     assert_eq!(steps.load(Ordering::Relaxed), 2);

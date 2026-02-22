@@ -3,12 +3,13 @@
 use ::std::panic::{AssertUnwindSafe, catch_unwind};
 use ::std::sync::Arc;
 use ::std::sync::atomic::{AtomicUsize, Ordering};
-use ::std::thread::sleep as thread_sleep;
 use ::std::time::Duration;
 
 use ::tokio::runtime::Runtime;
 use ::tokio_immediate::AsyncViewport;
 use ::tokio_immediate::serial::AsyncSerialRunner;
+
+use crate::common::{WAIT_TIMEOUT, wait_until};
 
 #[test]
 fn serial_runner_executes_tasks_in_submission_order() {
@@ -26,8 +27,14 @@ fn serial_runner_executes_tasks_in_submission_order() {
         2_u32
     });
 
-    thread_sleep(Duration::from_millis(50));
-    runner.poll();
+    wait_until(
+        || {
+            runner.poll();
+            runner.is_idle() && runner.values_len() == 2
+        },
+        WAIT_TIMEOUT,
+        "timed out waiting for serial tasks to finish in submission order",
+    );
 
     let values: Vec<u32> = runner.take_values_current().collect();
     assert_eq!(values, vec![1_u32, 2_u32]);
@@ -53,10 +60,21 @@ fn serial_runner_accumulates_values_without_ui_polling() {
         12_u32
     });
 
-    thread_sleep(Duration::from_millis(30));
+    wait_until(
+        || runner.values_len() == 3,
+        WAIT_TIMEOUT,
+        "timed out waiting for serial runner to buffer values",
+    );
 
     assert_eq!(runner.values_len(), 3);
-    runner.poll();
+    wait_until(
+        || {
+            runner.poll();
+            runner.is_idle()
+        },
+        WAIT_TIMEOUT,
+        "timed out waiting for serial runner to become idle",
+    );
     assert!(runner.is_idle());
 }
 
@@ -76,8 +94,19 @@ fn serial_runner_run_unit_does_not_buffer_values() {
         }
     });
 
-    thread_sleep(Duration::from_millis(20));
-    runner.poll();
+    wait_until(
+        || ran.load(Ordering::Relaxed) == 1,
+        WAIT_TIMEOUT,
+        "timed out waiting for serial run_unit task to execute",
+    );
+    wait_until(
+        || {
+            runner.poll();
+            runner.is_idle()
+        },
+        WAIT_TIMEOUT,
+        "timed out waiting for serial run_unit task to settle",
+    );
 
     assert_eq!(ran.load(Ordering::Relaxed), 1);
     assert_eq!(runner.values_len(), 0);
@@ -95,8 +124,14 @@ fn serial_runner_take_values_variants_work() {
     runner.run(async { 2_u32 });
     runner.run(async { 3_u32 });
 
-    thread_sleep(Duration::from_millis(20));
-    runner.poll();
+    wait_until(
+        || {
+            runner.poll();
+            runner.is_idle() && runner.values_len() == 3
+        },
+        WAIT_TIMEOUT,
+        "timed out waiting for serial values to become available",
+    );
 
     assert_eq!(runner.take_value(), Some(1_u32));
 
@@ -117,13 +152,9 @@ fn serial_runner_propagates_task_panics_on_poll() {
         panic!("task panic should propagate via poll");
     });
 
-    for _ in 0..100 {
-        let poll_result = catch_unwind(AssertUnwindSafe(|| runner.poll()));
-        if poll_result.is_err() {
-            return;
-        }
-        thread_sleep(Duration::from_millis(1));
-    }
-
-    panic!("expected serial runner poll to re-raise task panic");
+    wait_until(
+        || catch_unwind(AssertUnwindSafe(|| runner.poll())).is_err(),
+        WAIT_TIMEOUT,
+        "expected serial runner poll to re-raise task panic",
+    );
 }
