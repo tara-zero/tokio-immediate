@@ -39,6 +39,7 @@ pub use ::tokio_immediate::sync;
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use ::tokio_immediate::trigger;
 
+pub use ::tokio_immediate::parallel;
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub use ::tokio_immediate::serial;
@@ -48,6 +49,7 @@ pub use ::tokio_immediate::{
     AsyncWakeUpGuard, AsyncWaker, AsyncWakerList,
 };
 
+use ::tokio_immediate::parallel::AsyncParallelRunner;
 #[cfg(feature = "sync")]
 use ::tokio_immediate::serial::AsyncSerialRunner;
 use ::tokio_immediate::single::AsyncCall;
@@ -260,6 +262,82 @@ impl EguiAsync {
         A: AsyncRuntime,
     {
         AsyncSerialRunner::new_with_runtime(self.new_waker_for(viewport_id), runtime)
+    }
+
+    /// Creates an [`AsyncParallelRunner`] bound to the root viewport, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    pub fn new_parallel_runner_for_root<T, A>(&self) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncParallelRunner::new(self.new_waker_for_root())
+    }
+
+    /// Creates an [`AsyncParallelRunner`] bound to the root viewport with an
+    /// explicit runtime.
+    #[must_use]
+    pub fn new_parallel_runner_with_runtime_for_root<T, A>(
+        &self,
+        runtime: A,
+    ) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncParallelRunner::new_with_runtime(self.new_waker_for_root(), runtime)
+    }
+
+    /// Creates an [`AsyncParallelRunner`] bound to the current viewport, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    pub fn new_parallel_runner<T, A>(&self) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncParallelRunner::new(self.new_waker())
+    }
+
+    /// Creates an [`AsyncParallelRunner`] bound to the current viewport with
+    /// an explicit runtime.
+    #[must_use]
+    pub fn new_parallel_runner_with_runtime<T, A>(&self, runtime: A) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncParallelRunner::new_with_runtime(self.new_waker(), runtime)
+    }
+
+    /// Creates an [`AsyncParallelRunner`] bound to `viewport_id`, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    pub fn new_parallel_runner_for<T, A>(
+        &self,
+        viewport_id: ViewportId,
+    ) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncParallelRunner::new(self.new_waker_for(viewport_id))
+    }
+
+    /// Creates an [`AsyncParallelRunner`] bound to `viewport_id` with an
+    /// explicit runtime.
+    #[must_use]
+    pub fn new_parallel_runner_with_runtime_for<T, A>(
+        &self,
+        runtime: A,
+        viewport_id: ViewportId,
+    ) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncParallelRunner::new_with_runtime(self.new_waker_for(viewport_id), runtime)
     }
 
     /// Creates an [`AsyncWaker`] for the root viewport.
@@ -552,6 +630,78 @@ impl EguiAsyncPlugin {
     {
         self.upgrade()
             .new_serial_runner_with_runtime_for(runtime, viewport_id)
+    }
+
+    /// See [`EguiAsync::new_parallel_runner_for_root()`].
+    #[must_use]
+    pub fn new_parallel_runner_for_root<T, A>(&self) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        self.upgrade().new_parallel_runner_for_root()
+    }
+
+    /// See [`EguiAsync::new_parallel_runner_with_runtime_for_root()`].
+    #[must_use]
+    pub fn new_parallel_runner_with_runtime_for_root<T, A>(
+        &self,
+        runtime: A,
+    ) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        self.upgrade()
+            .new_parallel_runner_with_runtime_for_root(runtime)
+    }
+
+    /// See [`EguiAsync::new_parallel_runner()`].
+    #[must_use]
+    pub fn new_parallel_runner<T, A>(&self) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        self.upgrade().new_parallel_runner()
+    }
+
+    /// See [`EguiAsync::new_parallel_runner_with_runtime()`].
+    #[must_use]
+    pub fn new_parallel_runner_with_runtime<T, A>(&self, runtime: A) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        self.upgrade().new_parallel_runner_with_runtime(runtime)
+    }
+
+    /// See [`EguiAsync::new_parallel_runner_for()`].
+    #[must_use]
+    pub fn new_parallel_runner_for<T, A>(
+        &self,
+        viewport_id: ViewportId,
+    ) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        self.upgrade().new_parallel_runner_for(viewport_id)
+    }
+
+    /// See [`EguiAsync::new_parallel_runner_with_runtime_for()`].
+    #[must_use]
+    pub fn new_parallel_runner_with_runtime_for<T, A>(
+        &self,
+        runtime: A,
+        viewport_id: ViewportId,
+    ) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        self.upgrade()
+            .new_parallel_runner_with_runtime_for(runtime, viewport_id)
     }
 
     /// See [`EguiAsync::new_waker_for_root()`].
