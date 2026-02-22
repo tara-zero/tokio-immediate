@@ -2,6 +2,8 @@
 
 // TODO: Most of the tests are LLM-generated. Needs review.
 
+#[cfg(test)]
+mod parallel;
 #[cfg(all(test, feature = "sync"))]
 mod serial;
 #[cfg(test)]

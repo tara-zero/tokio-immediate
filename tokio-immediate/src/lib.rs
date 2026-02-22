@@ -11,7 +11,8 @@
 //! With the `sync` feature enabled, the [`sync`] and [`trigger`] modules
 //! provide channel wrappers that wake viewports when values are sent,
 //! enabling continuous progress reporting from async tasks to the UI.
-//! The `serial` module is also enabled by that feature and provides
+//! The `parallel` module provides `AsyncParallelRunner`.
+//! The `serial` module is enabled by the `sync` feature and provides
 //! `AsyncSerialRunner`.
 //!
 //! ## Feature flags
@@ -32,11 +33,13 @@ use ::std::sync::atomic::{AtomicBool, Ordering};
 use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use ::tokio::runtime::Handle;
-use ::tokio::task::JoinHandle;
+use ::tokio::task::{JoinHandle, JoinSet};
 
 /// Re-export `tokio` crate.
 pub use ::tokio;
 
+/// Async parallel runner: schedule futures to run concurrently.
+pub mod parallel;
 /// Async serial runner: schedule futures to run one after another.
 #[cfg(feature = "sync")]
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
@@ -52,6 +55,7 @@ pub mod sync;
 #[cfg_attr(docsrs, doc(cfg(feature = "sync")))]
 pub mod trigger;
 
+use parallel::AsyncParallelRunner;
 #[cfg(feature = "sync")]
 use serial::AsyncSerialRunner;
 use single::AsyncCall;
@@ -139,6 +143,12 @@ pub trait AsyncWakeUp {
 pub trait AsyncRuntime {
     /// Spawns a future onto the runtime, returning a [`JoinHandle`].
     fn spawn<Fut, T>(&mut self, future: Fut) -> JoinHandle<T>
+    where
+        Fut: 'static + Send + Future<Output = T>,
+        T: 'static + Send;
+
+    /// Spawns a future onto the runtime and tracks it in a [`JoinSet`].
+    fn spawn_join_set<Fut, T>(&mut self, join_set: &mut JoinSet<T>, future: Fut)
     where
         Fut: 'static + Send + Future<Output = T>,
         T: 'static + Send;
@@ -271,6 +281,28 @@ impl AsyncViewport {
         A: AsyncRuntime,
     {
         AsyncSerialRunner::new_with_runtime(self.new_waker(), runtime)
+    }
+
+    /// Creates an [`AsyncParallelRunner`] wired to this viewport, using
+    /// `A::default()` as the runtime.
+    #[must_use]
+    pub fn new_parallel_runner<T, A>(&self) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: Default + AsyncRuntime,
+    {
+        AsyncParallelRunner::new(self.new_waker())
+    }
+
+    /// Creates an [`AsyncParallelRunner`] wired to this viewport with an
+    /// explicit runtime.
+    #[must_use]
+    pub fn new_parallel_runner_with_runtime<T, A>(&self, runtime: A) -> AsyncParallelRunner<T, A>
+    where
+        T: 'static + Send,
+        A: AsyncRuntime,
+    {
+        AsyncParallelRunner::new_with_runtime(self.new_waker(), runtime)
     }
 
     /// Creates a new [`AsyncWaker`] that can request a repaint of this
@@ -464,6 +496,14 @@ impl AsyncRuntime for AsyncCurrentRuntime {
         tokio::spawn(future)
     }
 
+    fn spawn_join_set<Fut, T>(&mut self, join_set: &mut JoinSet<T>, future: Fut)
+    where
+        Fut: 'static + Send + Future<Output = T>,
+        T: 'static + Send,
+    {
+        drop(join_set.spawn(future));
+    }
+
     fn block_on<T>(&mut self, join_handle: JoinHandle<T>) -> Option<T>
     where
         T: 'static + Send,
@@ -489,6 +529,14 @@ impl AsyncRuntime for Handle {
         T: 'static + Send,
     {
         Handle::spawn(self, future)
+    }
+
+    fn spawn_join_set<Fut, T>(&mut self, join_set: &mut JoinSet<T>, future: Fut)
+    where
+        Fut: 'static + Send + Future<Output = T>,
+        T: 'static + Send,
+    {
+        drop(join_set.spawn_on(future, self));
     }
 
     fn block_on<T>(&mut self, join_handle: JoinHandle<T>) -> Option<T>
