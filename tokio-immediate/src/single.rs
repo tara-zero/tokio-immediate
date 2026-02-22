@@ -270,10 +270,8 @@ where
             let AsyncCallState::Running(join_handle) =
                 replace(&mut self.state, AsyncCallState::Stopped)
             else {
-                unsafe {
-                    // SAFETY: We already checked that state is `AsyncCallState::Running`.
-                    unreachable_unchecked()
-                }
+                // SAFETY: The `if let` above already established that `self.state` is `Running`.
+                unsafe { unreachable_unchecked() }
             };
 
             if let Some(value) = self.runtime.block_on(join_handle) {
@@ -319,9 +317,9 @@ where
     type Output = Fut::Output;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        // SAFETY: Once `AsyncCallTask` is pinned by the executor, `future` will not move again.
+        // We only create a pinned projection to poll it in place.
         unsafe {
-            // SAFETY: Once `AsyncCallTask` is pinned by the executor, `future` will not be moved
-            // anywhere. We only create a pinned projection to poll it in place.
             let this = self.as_mut().get_unchecked_mut();
             Pin::new_unchecked(&mut this.future)
         }

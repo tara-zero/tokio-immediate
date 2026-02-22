@@ -25,6 +25,7 @@
 // Clippy lints.
 #![warn(clippy::pedantic)]
 #![warn(clippy::cargo)]
+#![warn(clippy::undocumented_unsafe_blocks)]
 
 use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
