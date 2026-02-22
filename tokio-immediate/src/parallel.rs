@@ -88,6 +88,12 @@ where
     }
 
     /// Schedules a future whose output can be retrieved later.
+    ///
+    /// # Panics
+    ///
+    /// Panics if runtime access preconditions are not met by the selected
+    /// [`AsyncRuntime`] implementation. For example, [`AsyncCurrentRuntime`]
+    /// panics when called outside a Tokio runtime context.
     pub fn run<Fut>(&mut self, future: Fut)
     where
         Fut: 'static + Send + Future<Output = T>,
@@ -96,6 +102,12 @@ where
     }
 
     /// Schedules a future whose output is discarded.
+    ///
+    /// # Panics
+    ///
+    /// Panics if runtime access preconditions are not met by the selected
+    /// [`AsyncRuntime`] implementation. For example, [`AsyncCurrentRuntime`]
+    /// panics when called outside a Tokio runtime context.
     pub fn run_unit<Fut>(&mut self, future: Fut)
     where
         Fut: 'static + Send + Future<Output = ()>,
@@ -110,7 +122,7 @@ where
     ///
     /// # Panics
     ///
-    /// Panics when one of the submitted futures panics.
+    /// Re-raises panics from submitted futures in the calling thread.
     pub fn poll(&mut self) {
         let pending = self.finishing_tasks.load(Ordering::Acquire);
         if pending == 0 {

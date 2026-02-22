@@ -71,6 +71,19 @@ use ::tokio_immediate::single::AsyncCall;
 /// completion, but the UI will not be notified. Because of this, creating
 /// [`AsyncCall`] instances for non-root viewports ahead of time is
 /// pointless; create them only once the viewport is actually open.
+///
+/// # Panics
+///
+/// Factory methods that create viewport-bound objects (`new_call*`,
+/// `new_serial_runner*`, `new_parallel_runner*`, `new_waker*`, and
+/// `new_trigger*`) require the plugin returned by [`plugin()`](Self::plugin)
+/// to be registered and initialized via [`Context::add_plugin()`]. Calling
+/// them before plugin setup panics.
+///
+/// `new_serial_runner*` methods may additionally panic if runtime access
+/// preconditions are not met by the selected runtime (for example,
+/// [`AsyncCurrentRuntime`] requires a Tokio runtime context on the current
+/// thread).
 #[derive(Default, Clone)]
 pub struct EguiAsync {
     inner: Arc<RwLock<EguiAsyncPluginInner>>,
@@ -86,6 +99,14 @@ pub struct EguiAsync {
 /// alive for the plugin to function.
 ///
 /// Also exposes the same factory methods as [`EguiAsync`] for convenience.
+///
+/// # Panics
+///
+/// All forwarding factory methods panic if this plugin outlives its owning
+/// [`EguiAsync`] value.
+///
+/// They also inherit the panic conditions documented on the corresponding
+/// [`EguiAsync`] methods.
 #[derive(Clone)]
 pub struct EguiAsyncPlugin {
     inner: Weak<RwLock<EguiAsyncPluginInner>>,

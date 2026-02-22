@@ -52,6 +52,12 @@ where
     A: Default + AsyncRuntime,
 {
     /// Creates a new runner using `A::default()` as the runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if runtime access preconditions are not met by the selected
+    /// [`AsyncRuntime`] implementation. For example, [`AsyncCurrentRuntime`]
+    /// panics when called outside a Tokio runtime context.
     #[must_use]
     pub fn new(waker: AsyncWaker) -> Self {
         Self::new_with_runtime(waker, A::default())
@@ -64,6 +70,11 @@ where
     A: AsyncRuntime,
 {
     /// Creates a new runner with an explicit runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if runtime access preconditions are not met by `runtime` while
+    /// starting the internal worker task.
     #[must_use]
     pub fn new_with_runtime(waker: AsyncWaker, runtime: A) -> Self {
         let (future_sender, future_receiver) = tokio_mpsc::unbounded_channel();
@@ -111,6 +122,11 @@ where
     /// Polls worker state.
     ///
     /// If the worker task or one of the submitted futures panicked, this re-raises the panic.
+    ///
+    /// # Panics
+    ///
+    /// Re-raises panics from the internal worker task or submitted futures in
+    /// the calling thread.
     pub fn poll(&mut self) {
         let _ = self.worker.poll();
     }

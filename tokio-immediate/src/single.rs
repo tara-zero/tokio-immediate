@@ -188,6 +188,12 @@ where
     /// Returns the **previous** state. If a task was already running, the
     /// caller is responsible for deciding what to do with the old
     /// [`JoinHandle`] (e.g. abort it).
+    ///
+    /// # Panics
+    ///
+    /// Panics if runtime access preconditions are not met by the selected
+    /// [`AsyncRuntime`] implementation. For example, [`AsyncCurrentRuntime`]
+    /// panics when called outside a Tokio runtime context.
     #[must_use]
     pub fn start<Fut>(&mut self, future: Fut) -> AsyncCallState<T>
     where
@@ -255,6 +261,14 @@ where
     /// Returns `false` if the task is still running or no task has been started.
     ///
     /// Call this once per frame, before inspecting the state.
+    ///
+    /// # Panics
+    ///
+    /// Panics if runtime access preconditions are not met by the selected
+    /// [`AsyncRuntime`] implementation. For example, [`AsyncCurrentRuntime`]
+    /// panics when called outside a Tokio runtime context.
+    ///
+    /// Re-raises panics from the spawned future in the calling thread.
     pub fn poll(&mut self) -> bool {
         if let AsyncCallState::Running(join_handle) = &self.state {
             if !self.task_is_finishing.load(Ordering::Acquire) {

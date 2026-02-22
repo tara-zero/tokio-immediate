@@ -143,12 +143,22 @@ pub trait AsyncWakeUp {
 /// [`Handle`] (explicit handle stored inside `AsyncCall`).
 pub trait AsyncRuntime {
     /// Spawns a future onto the runtime, returning a [`JoinHandle`].
+    ///
+    /// # Panics
+    ///
+    /// Implementations may panic if their runtime access preconditions are not
+    /// met.
     fn spawn<Fut, T>(&mut self, future: Fut) -> JoinHandle<T>
     where
         Fut: 'static + Send + Future<Output = T>,
         T: 'static + Send;
 
     /// Spawns a future onto the runtime and tracks it in a [`JoinSet`].
+    ///
+    /// # Panics
+    ///
+    /// Implementations may panic if their runtime access preconditions are not
+    /// met.
     fn spawn_join_set<Fut, T>(&mut self, join_set: &mut JoinSet<T>, future: Fut)
     where
         Fut: 'static + Send + Future<Output = T>,
@@ -159,6 +169,13 @@ pub trait AsyncRuntime {
     /// Returns `Some(value)` on success, or `None` if the task was
     /// cancelled. Re-raises the panic (via [`resume_unwind`]) if the task
     /// panicked.
+    ///
+    /// # Panics
+    ///
+    /// Implementations may panic if their runtime access preconditions are not
+    /// met.
+    ///
+    /// Re-raises panics from the joined task in the calling thread.
     fn block_on<T>(&mut self, join_handle: JoinHandle<T>) -> Option<T>
     where
         T: 'static + Send;
