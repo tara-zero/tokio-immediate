@@ -16,6 +16,7 @@ use ::egui::{
     UiBuilder, Vec2, ViewportBuilder, ViewportClass, ViewportId,
 };
 use ::futures_util::StreamExt as _;
+use ::tokio_immediate_egui::parallel::AsyncParallelRunner;
 use ::tokio_immediate_egui::single::{AsyncCall, AsyncCallState};
 use ::tokio_immediate_egui::sync::watch;
 use ::tokio_immediate_egui::tokio::runtime::{Handle, Runtime};
@@ -64,6 +65,7 @@ struct SecondWindow {
     sender: watch::Sender<usize>,
     receiver: watch::Receiver<usize>,
     async_counter: AsyncCall<(), Handle>,
+    async_deferred_add: AsyncParallelRunner<(), Handle>,
 }
 
 struct DownloadInner {
@@ -441,7 +443,9 @@ impl SecondWindow {
 
             sender,
             receiver,
-            async_counter: egui_async.new_call_with_runtime_for(runtime, viewport_id),
+            async_counter: egui_async.new_call_with_runtime_for(runtime.clone(), viewport_id),
+            async_deferred_add: egui_async
+                .new_parallel_runner_with_runtime_for(runtime, viewport_id),
         }
     }
 
@@ -468,22 +472,48 @@ impl SecondWindow {
         ui.separator();
 
         self.async_counter.poll();
+        self.async_deferred_add.poll();
 
         if self.async_counter.is_stopped() {
             let sender = self.sender.clone();
             let _ = self.async_counter.start(async move {
-                let mut seconds = 0;
                 loop {
-                    sender.im_send_replace(seconds);
                     tokio::time::sleep(Duration::from_secs(1)).await;
-                    seconds += 1;
+                    sender.im_send_modify(|counter| {
+                        *counter += 1;
+                    });
                 }
             });
         }
 
         if self.async_counter.is_running() {
-            ui.label("Seconds passed:");
+            ui.label("Counter:");
             ui.label(RichText::new(self.receiver.borrow().to_string()).size(100.0));
+
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button("Defer +1").clicked() {
+                    let sender = self.sender.clone();
+                    self.async_deferred_add.run_unit(async move {
+                        tokio::time::sleep(Duration::from_secs(2)).await;
+                        // No need to use im_send_modify() here because AsyncParallelRunner wakes up UI on completion.
+                        sender.send_modify(|counter| {
+                            *counter += 1;
+                        });
+                    });
+                }
+
+                if ui.button("Defer +2").clicked() {
+                    let sender = self.sender.clone();
+                    self.async_deferred_add.run_unit(async move {
+                        tokio::time::sleep(Duration::from_secs(2)).await;
+                        // No need to use im_send_modify() here because AsyncParallelRunner wakes up UI on completion.
+                        sender.send_modify(|counter| {
+                            *counter += 2;
+                        });
+                    });
+                }
+            });
         }
     }
 }
