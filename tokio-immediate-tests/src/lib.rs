@@ -2,6 +2,8 @@
 
 // TODO: Most of the tests are LLM-generated. Needs review.
 
+#![warn(clippy::undocumented_unsafe_blocks)]
+
 #[cfg(test)]
 mod parallel;
 #[cfg(all(test, feature = "sync"))]
@@ -81,6 +83,7 @@ mod tests {
         viewport_one.woke_up();
         viewport_two.woke_up();
 
+        // SAFETY: `index_one` was returned by `add_waker` above and this test removes it once.
         unsafe {
             waker_list.remove_waker(index_one);
         }

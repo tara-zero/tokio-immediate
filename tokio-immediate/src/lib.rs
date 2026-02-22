@@ -25,6 +25,7 @@
 // Clippy lints.
 #![warn(clippy::pedantic)]
 #![warn(clippy::cargo)]
+#![warn(clippy::undocumented_unsafe_blocks)]
 
 use ::std::mem::replace;
 use ::std::ops::Deref;
@@ -367,10 +368,9 @@ impl AsyncWakerList {
     pub fn add_waker(&self, waker: AsyncWaker) -> usize {
         let mut inner = self.inner_mut();
         if let Some(idx) = inner.free.pop() {
-            let place = unsafe {
-                // SAFETY: This is safe because we never shrink the vector and put valid indexes only into free list.
-                inner.wakers.get_unchecked_mut(idx)
-            };
+            // SAFETY: We never shrink `wakers`, and `free` contains only indexes
+            // previously produced by `add_waker`.
+            let place = unsafe { inner.wakers.get_unchecked_mut(idx) };
             *place = Some(waker);
             idx
         } else {
@@ -391,10 +391,8 @@ impl AsyncWakerList {
     /// **exactly once** per index.
     pub unsafe fn remove_waker(&self, idx: usize) {
         let mut inner = self.inner_mut();
-        let place = unsafe {
-            // SAFETY: This is safe because `idx` is a valid index returned by `AsyncWakerList::add_waker()`.
-            inner.wakers.get_unchecked_mut(idx)
-        };
+        // SAFETY: `idx` must satisfy this function's safety contract.
+        let place = unsafe { inner.wakers.get_unchecked_mut(idx) };
         *place = None;
         inner.free.push(idx);
     }

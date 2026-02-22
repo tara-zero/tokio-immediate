@@ -224,9 +224,9 @@ where
     type Output = Fut::Output;
 
     fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        // SAFETY: Once `AsyncParallelRunnerTask` is pinned by the executor, `future` will not
+        // move again. We only create a pinned projection to poll it in place.
         unsafe {
-            // SAFETY: Once `AsyncParallelRunnerTask` is pinned by the executor, `future` will not be moved
-            // anywhere. We only create a pinned projection to poll it in place.
             let this = self.as_mut().get_unchecked_mut();
             Pin::new_unchecked(&mut this.future)
         }

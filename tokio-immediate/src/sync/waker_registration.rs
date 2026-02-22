@@ -10,9 +10,9 @@ pub(super) struct WakerRegistration {
 impl Drop for WakerRegistration {
     fn drop(&mut self) {
         if self.waker_idx != usize::MAX {
+            // SAFETY: `self.waker_idx` was returned by `AsyncWakerList::add_waker()` and this
+            // registration removes it at most once during drop.
             unsafe {
-                // SAFETY: This is safe because `self.waker_idx` is a valid index returned
-                // by `AsyncWakerList::add_waker()` and we are removing only once.
                 self.wakers.remove_waker(self.waker_idx);
             }
         }
