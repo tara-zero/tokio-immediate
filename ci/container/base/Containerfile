@@ -117,6 +117,17 @@ RUN rustup \
         --component "${rust_toolchain_components}" \
         "nightly"
 
+# Install `sccache`.
+RUN dnf \
+        install \
+        --assumeyes \
+        "openssl-devel"
+RUN cargo \
+        install \
+        --bins \
+        --features "all" \
+        "sccache"
+
 # Remove caches.
 RUN dnf clean all
 RUN rm -rf "/root/.cargo/registry"
