@@ -59,3 +59,10 @@ path = "tokio-immediate"
 version = "0.2.0"
 default-features = false
 path = "tokio-immediate-egui"
+
+# Add fix for https://github.com/gfx-rs/wgpu/issues/9293.
+# Without this fix, wgpu-enabled examples fail on Raspberry Pi 5 with following panic:
+#   wgpu-hal invariant was violated (usage error): Requested feature is not available on this device
+[patch.crates-io.wgpu]
+git = "https://github.com/tara-zero/wgpu.git"
+rev = "3f073a19ca32894ff22746b02452430206b508e8"
