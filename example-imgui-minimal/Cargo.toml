@@ -19,6 +19,7 @@ sync = []
 [dependencies]
 dear-app.workspace = true
 dear-imgui-rs.workspace = true
+pollster.workspace = true
 tokio-immediate.workspace = true
 winit.workspace = true
 

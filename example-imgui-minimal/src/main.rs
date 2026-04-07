@@ -6,9 +6,12 @@ use ::std::net::SocketAddr;
 use ::std::sync::Arc;
 use ::std::time::Duration;
 
-use ::dear_app::wgpu::Limits;
+use ::dear_app::wgpu::{
+    Instance, InstanceDescriptor, Limits, MemoryHints, PowerPreference, RequestAdapterOptions,
+};
 use ::dear_app::{AppBuilder, RedrawMode, RunnerConfig, WgpuConfig};
 use ::dear_imgui_rs::{Condition, InputText, Ui, WindowFlags};
+use ::pollster::FutureExt;
 use ::tokio::net::TcpSocket;
 use ::tokio::runtime::Runtime;
 use ::tokio::time::timeout;
@@ -23,14 +26,30 @@ fn main() {
     let viewport = AsyncViewport::default();
     let mut app = ExampleApp::new(viewport.clone());
 
+    // TODO: This is an ugly hack and should be done inside `dear-app`.
+    let adapter = Instance::new(InstanceDescriptor::new_without_display_handle_from_env())
+        .request_adapter(&RequestAdapterOptions {
+            power_preference: PowerPreference::LowPower,
+            force_fallback_adapter: false,
+            compatible_surface: None,
+        })
+        .block_on()
+        .expect("Failed to get default WGPU adapter");
+
     AppBuilder::new()
         .with_config(RunnerConfig {
             window_title: String::from("TCPing"),
             window_size: (300.0, 150.0),
             wgpu: WgpuConfig {
-                // Require lower limits to make this work on Apple M2 with Asahi Linux.
-                // wgpu's default limits are too high.
-                required_limits: Limits::downlevel_webgl2_defaults(),
+                power_preference: PowerPreference::LowPower,
+                required_limits: Limits {
+                    // Require support for displays with high resolution.
+                    max_texture_dimension_2d: adapter.limits().max_texture_dimension_2d,
+                    // Require lower limits to make this work on Raspberry Pi 5 and Apple M2 with Asahi Linux.
+                    // wgpu's Limits::default() are too high.
+                    ..Limits::downlevel_webgl2_defaults()
+                },
+                memory_hints: MemoryHints::MemoryUsage,
                 ..WgpuConfig::default()
             },
             redraw: RedrawMode::Wait,

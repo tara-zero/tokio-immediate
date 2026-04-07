@@ -24,7 +24,7 @@ use ::tokio_immediate_egui::tokio::runtime::{Handle, Runtime};
 use ::tokio_immediate_egui::trigger::AsyncTrigger;
 use ::tokio_immediate_egui::{AsyncWaker, EguiAsync};
 use ::tokio_util::sync::CancellationToken;
-use ::wgpu::Limits;
+use ::wgpu::{Limits, MemoryHints, PowerPreference};
 
 const APP_NAME: &str = "egui + tokio-immediate";
 const SECOND_WINDOW_ID: &str = "second-window";
@@ -41,19 +41,22 @@ fn main() -> ::eframe::Result {
                 .with_min_inner_size([400.0, 550.0]),
             wgpu_options: WgpuConfiguration {
                 wgpu_setup: WgpuSetup::CreateNew(WgpuSetupCreateNew {
+                    power_preference: PowerPreference::LowPower,
                     device_descriptor: Arc::new(|adapter| {
                         let mut descriptor = (*WgpuSetupCreateNew::without_display_handle()
                             .device_descriptor)(
                             adapter
                         );
-                        let max_texture_dimension_2d =
-                            descriptor.required_limits.max_texture_dimension_2d;
-                        // Require lower limits to make this work on Apple M2 with Asahi Linux.
-                        // wgpu's default limits are too high.
-                        descriptor.required_limits = Limits::downlevel_webgl2_defaults();
-                        // Restore original max_texture_dimension_2d required to support 4k+ displays.
-                        descriptor.required_limits.max_texture_dimension_2d =
-                            max_texture_dimension_2d;
+                        descriptor.required_limits = Limits {
+                            // Require support for displays with high resolution.
+                            // This is more flexible than hardcoded value at
+                            // https://github.com/emilk/egui/blob/d985bf9b83fb69b7028152ddaa6ee9ec993eb4d9/crates/egui-wgpu/src/setup.rs#L266.
+                            max_texture_dimension_2d: adapter.limits().max_texture_dimension_2d,
+                            // Require lower limits to make this work on Raspberry Pi 5 and Apple M2 with Asahi Linux.
+                            // wgpu's Limits::default() are too high.
+                            ..Limits::downlevel_webgl2_defaults()
+                        };
+                        descriptor.memory_hints = MemoryHints::MemoryUsage;
                         descriptor
                     }),
                     ..WgpuSetupCreateNew::without_display_handle()
