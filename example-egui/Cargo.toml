@@ -42,6 +42,12 @@ features = [
     "default_fonts",
 ]
 
+[dependencies.egui-wgpu]
+workspace = true
+features = [
+    "default",
+]
+
 [dependencies.reqwest]
 workspace = true
 features = [

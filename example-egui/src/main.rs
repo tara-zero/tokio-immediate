@@ -15,6 +15,7 @@ use ::egui::{
     Align, CentralPanel, Color32, Label, Layout, ProgressBar, Rect, RichText, TextEdit, Ui,
     UiBuilder, Vec2, ViewportBuilder, ViewportClass, ViewportId,
 };
+use ::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
 use ::futures_util::StreamExt as _;
 use ::tokio_immediate_egui::parallel::AsyncParallelRunner;
 use ::tokio_immediate_egui::single::{AsyncCall, AsyncCallState};
@@ -23,6 +24,7 @@ use ::tokio_immediate_egui::tokio::runtime::{Handle, Runtime};
 use ::tokio_immediate_egui::trigger::AsyncTrigger;
 use ::tokio_immediate_egui::{AsyncWaker, EguiAsync};
 use ::tokio_util::sync::CancellationToken;
+use ::wgpu::Limits;
 
 const APP_NAME: &str = "egui + tokio-immediate";
 const SECOND_WINDOW_ID: &str = "second-window";
@@ -37,6 +39,27 @@ fn main() -> ::eframe::Result {
             viewport: ViewportBuilder::default()
                 .with_inner_size([400.0, 550.0])
                 .with_min_inner_size([400.0, 550.0]),
+            wgpu_options: WgpuConfiguration {
+                wgpu_setup: WgpuSetup::CreateNew(WgpuSetupCreateNew {
+                    device_descriptor: Arc::new(|adapter| {
+                        let mut descriptor = (*WgpuSetupCreateNew::without_display_handle()
+                            .device_descriptor)(
+                            adapter
+                        );
+                        let max_texture_dimension_2d =
+                            descriptor.required_limits.max_texture_dimension_2d;
+                        // Require lower limits to make this work on Apple M2 with Asahi Linux.
+                        // wgpu's default limits are too high.
+                        descriptor.required_limits = Limits::downlevel_webgl2_defaults();
+                        // Restore original max_texture_dimension_2d required to support 4k+ displays.
+                        descriptor.required_limits.max_texture_dimension_2d =
+                            max_texture_dimension_2d;
+                        descriptor
+                    }),
+                    ..WgpuSetupCreateNew::without_display_handle()
+                }),
+                ..Default::default()
+            },
             ..Default::default()
         },
         Box::new(|cc| Ok(Box::new(ExampleApp::new(cc)))),
@@ -83,8 +106,8 @@ struct DownloadProgress {
 }
 
 impl ::eframe::App for ExampleApp {
-    fn update(&mut self, ctx: &::egui::Context, frame: &mut ::eframe::Frame) {
-        CentralPanel::default().show(ctx, |ui| {
+    fn ui(&mut self, ui: &mut ::egui::Ui, frame: &mut ::eframe::Frame) {
+        CentralPanel::default().show_inside(ui, |ui| {
             ui.vertical_centered(|ui| self.update_ui(ui, frame))
         });
     }
@@ -138,11 +161,13 @@ impl ExampleApp {
 
         // We use scopes with fixed IDs to make sure that all child widget IDs are stable
         // and thus things like focus and clicks are working as expected.
-        ui.scope_builder(UiBuilder::new().id("ui_new_window"), |ui| {
+        ui.scope_builder(UiBuilder::new().id_salt("ui_new_window"), |ui| {
             self.ui_new_window(ui);
         });
-        ui.scope_builder(UiBuilder::new().id("ui_concat"), |ui| self.ui_concat(ui));
-        ui.scope_builder(UiBuilder::new().id("ui_downloader"), |ui| {
+        ui.scope_builder(UiBuilder::new().id_salt("ui_concat"), |ui| {
+            self.ui_concat(ui);
+        });
+        ui.scope_builder(UiBuilder::new().id_salt("ui_downloader"), |ui| {
             self.ui_download(ui);
         });
     }
@@ -167,17 +192,17 @@ impl ExampleApp {
 
         if second_window.is_some() {
             let second_window = self.second_window.clone();
-            ui.ctx().show_viewport_deferred(
+            ui.show_viewport_deferred(
                 ViewportId::from_hash_of(SECOND_WINDOW_ID),
                 ViewportBuilder::default()
                     .with_title(APP_NAME)
                     .with_inner_size([300.0, 200.0])
                     .with_min_inner_size([300.0, 200.0]),
-                move |ctx, class| {
+                move |ui, class| {
                     let mut second_window = second_window.lock().expect("Poisoned by panic");
 
                     let close = if let Some(second_window) = second_window.as_mut() {
-                        second_window.update(ctx, class)
+                        second_window.ui(ui, class)
                     } else {
                         // Already closed.
                         false
@@ -449,12 +474,12 @@ impl SecondWindow {
         }
     }
 
-    fn update(&mut self, ctx: &::egui::Context, _class: ViewportClass) -> bool {
-        if ctx.input(|i| i.viewport().close_requested()) {
+    fn ui(&mut self, ui: &mut ::egui::Ui, _class: ViewportClass) -> bool {
+        if ui.ctx().input(|i| i.viewport().close_requested()) {
             return true;
         }
 
-        CentralPanel::default().show(ctx, |ui| ui.vertical_centered(|ui| self.update_ui(ui)));
+        CentralPanel::default().show_inside(ui, |ui| ui.vertical_centered(|ui| self.update_ui(ui)));
 
         false
     }

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- `egui` updated to version 0.34.
+
 ### Added
 ### Fixed
 

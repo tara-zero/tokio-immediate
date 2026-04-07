@@ -29,6 +29,8 @@
 
 use ::std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
+#[cfg(feature = "sync")]
+use ::egui::Ui;
 use ::egui::{Context, FullOutput, OrderedViewportIdMap, Plugin, RawInput, ViewportId};
 
 pub use ::tokio_immediate::tokio;
@@ -471,12 +473,12 @@ impl Plugin for EguiAsyncPlugin {
     }
 
     #[cfg(feature = "sync")]
-    fn on_end_pass(&mut self, ctx: &Context) {
+    fn on_end_pass(&mut self, ui: &mut Ui) {
         let egui_async = self.upgrade();
         let inner = Self::inner(&egui_async.inner);
 
-        if !ctx.will_discard()
-            && let Some(trigger) = inner.triggers.get(&ctx.viewport_id())
+        if !ui.ctx().will_discard()
+            && let Some(trigger) = inner.triggers.get(&ui.ctx().viewport_id())
         {
             trigger.trigger();
         }
