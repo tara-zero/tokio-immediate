@@ -39,7 +39,7 @@ fn main() {
     AppBuilder::new()
         .with_config(RunnerConfig {
             window_title: String::from("TCPing"),
-            window_size: (300.0, 150.0),
+            window_size: (300.0, 200.0),
             wgpu: WgpuConfig {
                 power_preference: PowerPreference::LowPower,
                 required_limits: Limits {
@@ -167,7 +167,7 @@ impl ExampleApp {
                     // Task completed, with an error.
                     AsyncCallState::Completed(Err(error)) => {
                         ui.text("TCPing failed:");
-                        ui.text(error);
+                        ui.text_wrapped(error);
                     }
                 }
             });
