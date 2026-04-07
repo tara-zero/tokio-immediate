@@ -5,8 +5,10 @@
 ### Changed
 - `egui` updated to version 0.34.
 
-### Added
 ### Fixed
+- Fixed various OS/HW-related portability issues in examples.
+
+### Added
 
 ## [0.2.0] - 2026-02-22
 
