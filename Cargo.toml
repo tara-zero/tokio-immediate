@@ -35,8 +35,8 @@ categories = [
 [workspace.dependencies]
 crossterm = { version = "0.29", default-features = false }
 document-features = { version = "0.2", default-features = false }
-dear-app = { version = "0.9", default-features = false }
-dear-imgui-rs = { version = "0.9", default-features = false }
+dear-app = { version = "0.11", default-features = false }
+dear-imgui-rs = { version = "0.11", default-features = false }
 eframe = { version = "0.33", default-features = false }
 egui = { version = "0.33", default-features = false }
 futures-util = { version = "0.3", default-features = false }

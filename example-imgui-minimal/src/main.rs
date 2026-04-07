@@ -6,7 +6,8 @@ use ::std::net::SocketAddr;
 use ::std::sync::Arc;
 use ::std::time::Duration;
 
-use ::dear_app::{AppBuilder, RedrawMode, RunnerConfig};
+use ::dear_app::wgpu::Limits;
+use ::dear_app::{AppBuilder, RedrawMode, RunnerConfig, WgpuConfig};
 use ::dear_imgui_rs::{Condition, InputText, Ui, WindowFlags};
 use ::tokio::net::TcpSocket;
 use ::tokio::runtime::Runtime;
@@ -26,6 +27,12 @@ fn main() {
         .with_config(RunnerConfig {
             window_title: String::from("TCPing"),
             window_size: (300.0, 150.0),
+            wgpu: WgpuConfig {
+                // Require lower limits to make this work on Apple M2 with Asahi Linux.
+                // wgpu's default limits are too high.
+                required_limits: Limits::downlevel_webgl2_defaults(),
+                ..WgpuConfig::default()
+            },
             redraw: RedrawMode::Wait,
             ..RunnerConfig::default()
         })
