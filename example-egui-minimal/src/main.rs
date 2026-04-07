@@ -20,8 +20,8 @@ fn main() -> ::eframe::Result {
         "TCPing",
         ::eframe::NativeOptions {
             viewport: ViewportBuilder::default()
-                .with_inner_size([300.0, 100.0])
-                .with_min_inner_size([300.0, 100.0]),
+                .with_inner_size([300.0, 150.0])
+                .with_min_inner_size([300.0, 150.0]),
             ..Default::default()
         },
         Box::new(|cc| {
