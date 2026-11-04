@@ -3,13 +3,12 @@
 #![warn(clippy::pedantic)]
 
 use ::std::net::SocketAddr;
-use ::std::sync::Arc;
 use ::std::time::Duration;
 
 use ::dear_app::wgpu::{
     Instance, InstanceDescriptor, Limits, MemoryHints, PowerPreference, RequestAdapterOptions,
 };
-use ::dear_app::{AppBuilder, RedrawMode, RunnerConfig, WgpuConfig};
+use ::dear_app::{AppConfig, Application, RedrawMode, WgpuConfig, run};
 use ::dear_imgui_rs::{Condition, InputText, Ui, WindowFlags};
 use ::pollster::FutureExt;
 use ::tokio::net::TcpSocket;
@@ -17,71 +16,41 @@ use ::tokio::runtime::Runtime;
 use ::tokio::time::timeout;
 use ::tokio_immediate::single::{AsyncCall, AsyncCallState};
 use ::tokio_immediate::{AsyncViewport, AsyncWakeUp};
-use ::winit::event::{Event, WindowEvent};
+use ::winit::event::WindowEvent;
 
 fn main() {
     let runtime = Runtime::new().expect("Failed to create Tokio runtime");
     let _runtime_guard = runtime.enter();
 
     let viewport = AsyncViewport::default();
-    let mut app = ExampleApp::new(viewport.clone());
+    let app = ExampleApp::new(viewport.clone());
 
     // TODO: This is an ugly hack and should be done inside `dear-app`.
     let adapter = Instance::new(InstanceDescriptor::new_without_display_handle_from_env())
-        .request_adapter(&RequestAdapterOptions {
-            power_preference: PowerPreference::LowPower,
-            force_fallback_adapter: false,
-            compatible_surface: None,
-        })
+        .request_adapter(&RequestAdapterOptions::default())
         .block_on()
         .expect("Failed to get default WGPU adapter");
 
-    AppBuilder::new()
-        .with_config(RunnerConfig {
-            window_title: String::from("TCPing"),
-            window_size: (300.0, 200.0),
-            wgpu: WgpuConfig {
-                power_preference: PowerPreference::LowPower,
-                required_limits: Limits {
-                    // Require support for displays with high resolution.
-                    max_texture_dimension_2d: adapter.limits().max_texture_dimension_2d,
-                    // Require lower limits to make this work on Raspberry Pi 5 and Apple M2 with Asahi Linux.
-                    // wgpu's Limits::default() are too high.
-                    ..Limits::downlevel_webgl2_defaults()
-                },
-                memory_hints: MemoryHints::MemoryUsage,
-                ..WgpuConfig::default()
+    let config = AppConfig {
+        window_title: String::from("TCPing"),
+        window_size: (300.0, 200.0),
+        wgpu: WgpuConfig {
+            power_preference: PowerPreference::LowPower,
+            required_limits: Limits {
+                // Require support for displays with high resolution.
+                max_texture_dimension_2d: adapter.limits().max_texture_dimension_2d,
+                // Require lower limits to make this work on Raspberry Pi 5 and Apple M2 with Asahi Linux.
+                // wgpu's Limits::default() are too high.
+                ..Limits::downlevel_webgl2_defaults()
             },
-            redraw: RedrawMode::Wait,
-            ..RunnerConfig::default()
-        })
-        .on_gpu_init({
-            move |window, _wgpu_device, _wgpu_queue, _wgpu_surface_conf| {
-                let window = window.clone();
-                let _ = viewport.replace_wake_up(Some(Arc::new(move || {
-                    window.request_redraw();
-                })));
-            }
-        })
-        .on_event({
-            |event, window, _ctx| {
-                let should_redraw = !matches!(
-                    event,
-                    Event::WindowEvent {
-                        event: WindowEvent::RedrawRequested,
-                        ..
-                    }
-                );
-                if should_redraw {
-                    window.request_redraw();
-                }
-            }
-        })
-        .on_frame(move |ui, _addons| {
-            app.render_ui(ui);
-        })
-        .run()
-        .expect("Failed to run dear-app");
+            memory_hints: MemoryHints::MemoryUsage,
+            ..WgpuConfig::default()
+        },
+        redraw: RedrawMode::Wait,
+        ..AppConfig::default()
+    };
+
+    run(config, app).expect("Failed to run dear-app");
 }
 
 struct ExampleApp {
@@ -89,6 +58,26 @@ struct ExampleApp {
     viewport: AsyncViewport,
     addr_port: String,
     tcping: AsyncCall<Result<(), String>>,
+}
+
+impl Application for ExampleApp {
+    fn frame(
+        &mut self,
+        context: &mut dear_app::FrameContext<'_>,
+    ) -> Result<(), dear_app::RunError> {
+        self.render_ui(context.ui());
+        Ok(())
+    }
+
+    fn event(
+        &mut self,
+        context: &mut dear_app::EventContext<'_>,
+    ) -> Result<(), dear_app::RunError> {
+        if let WindowEvent::RedrawRequested = context.event() {
+            context.window().request_redraw();
+        }
+        Ok(())
+    }
 }
 
 impl ExampleApp {

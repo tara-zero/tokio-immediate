@@ -35,13 +35,13 @@ categories = [
 [workspace.dependencies]
 crossterm = { version = "0.29", default-features = false }
 document-features = { version = "0.2", default-features = false }
-dear-app = { version = "0.11", default-features = false }
-dear-imgui-rs = { version = "0.11", default-features = false }
+dear-app = { version = "0.22", default-features = false }
+dear-imgui-rs = { version = "0.22", default-features = false }
 eframe = { version = "0.37", default-features = false }
 egui = { version = "0.37", default-features = false }
 egui-wgpu = { version = "0.37", default-features = false }
 futures-util = { version = "0.3", default-features = false }
-pollster = { version = "0.4", default-features = false }
+pollster = { version = "1", default-features = false }
 ratatui = { version = "0.30", default-features = false }
 reqwest = { version = "0.13", default-features = false }
 tokio = { version = "1", default-features = false }
@@ -58,10 +58,3 @@ path = "tokio-immediate"
 version = "0.2.0"
 default-features = false
 path = "tokio-immediate-egui"
-
-# Add fix for https://github.com/gfx-rs/wgpu/issues/9293.
-# Without this fix, wgpu-enabled examples fail on Raspberry Pi 5 with following panic:
-#   wgpu-hal invariant was violated (usage error): Requested feature is not available on this device
-[patch.crates-io.wgpu]
-git = "https://github.com/tara-zero/wgpu.git"
-rev = "3f073a19ca32894ff22746b02452430206b508e8"

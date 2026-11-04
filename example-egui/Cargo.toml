@@ -68,12 +68,3 @@ workspace = true
 features = [
     "sync",
 ]
-
-[dependencies.winit]
-workspace = true
-features = [
-    "x11",
-    "wayland",
-    "wayland-dlopen",
-    "wayland-csd-adwaita",
-]
