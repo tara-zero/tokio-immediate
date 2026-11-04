@@ -3624,7 +3624,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-immediate"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "document-features",
  "tokio",
@@ -3632,7 +3632,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-immediate-egui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "document-features",
  "egui",
@@ -3641,7 +3641,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-immediate-example-egui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "eframe",
  "egui",
@@ -3655,7 +3655,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-immediate-example-egui-minimal"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "eframe",
  "egui",
@@ -3665,7 +3665,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-immediate-example-imgui-minimal"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dear-app",
  "dear-imgui-rs",
@@ -3677,7 +3677,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-immediate-example-ratatui-minimal"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "crossterm",
  "futures-util",
@@ -3689,7 +3689,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-immediate-tests"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "tokio",
  "tokio-immediate",

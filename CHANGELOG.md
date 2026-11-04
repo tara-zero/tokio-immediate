@@ -3,10 +3,17 @@
 ## [Unreleased]
 
 ### Changed
-- `egui` updated to version 0.34.
+- `egui` updated to version 0.37.
+- Minimum Rust version updated to 1.95.
+- Bumped `tokio-immediate-egui` to 0.3.0 due to egui 0.37 upgrade (semver-incompatible).
+
+### Changed
+- Updated `Plugin` trait implementation for egui 0.35+ (`input_hook`/`output_hook` now take `&Context` parameter).
+- Updated `example-imgui-minimal` to use new `dear-app` API (`AppConfig`, `Application` trait, `run` function).
 
 ### Fixed
 - Fixed various OS/HW-related portability issues in examples.
+- Removed `winit` dependencies from `example-egui` and `example-egui-minimal` to avoid version conflicts.
 
 ### Added
 
