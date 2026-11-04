@@ -15,7 +15,10 @@ use ::egui::{
     Align, CentralPanel, Color32, Label, Layout, ProgressBar, Rect, RichText, TextEdit, Ui,
     UiBuilder, Vec2, ViewportBuilder, ViewportClass, ViewportId,
 };
-use ::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
+use ::egui_wgpu::{
+    WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew,
+    wgpu::{Limits, MemoryHints, PowerPreference},
+};
 use ::futures_util::StreamExt as _;
 use ::tokio_immediate_egui::parallel::AsyncParallelRunner;
 use ::tokio_immediate_egui::single::{AsyncCall, AsyncCallState};
@@ -24,7 +27,6 @@ use ::tokio_immediate_egui::tokio::runtime::{Handle, Runtime};
 use ::tokio_immediate_egui::trigger::AsyncTrigger;
 use ::tokio_immediate_egui::{AsyncWaker, EguiAsync};
 use ::tokio_util::sync::CancellationToken;
-use ::wgpu::{Limits, MemoryHints, PowerPreference};
 
 const APP_NAME: &str = "egui + tokio-immediate";
 const SECOND_WINDOW_ID: &str = "second-window";

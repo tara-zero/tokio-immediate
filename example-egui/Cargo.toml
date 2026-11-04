@@ -69,18 +69,6 @@ features = [
     "sync",
 ]
 
-[dependencies.wgpu]
-workspace = true
-features = [
-    "dx12",
-    "metal",
-    "vulkan",
-    "gles",
-    "static-dxc",
-    "std",
-    "parking_lot",
-]
-
 [dependencies.winit]
 workspace = true
 features = [
