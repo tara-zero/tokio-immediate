@@ -110,7 +110,7 @@ struct DownloadProgress {
 
 impl ::eframe::App for ExampleApp {
     fn ui(&mut self, ui: &mut ::egui::Ui, frame: &mut ::eframe::Frame) {
-        CentralPanel::default().show_inside(ui, |ui| {
+        CentralPanel::default().show(ui, |ui| {
             ui.vertical_centered(|ui| self.update_ui(ui, frame))
         });
     }
@@ -482,7 +482,7 @@ impl SecondWindow {
             return true;
         }
 
-        CentralPanel::default().show_inside(ui, |ui| ui.vertical_centered(|ui| self.update_ui(ui)));
+        CentralPanel::default().show(ui, |ui| ui.vertical_centered(|ui| self.update_ui(ui)));
 
         false
     }
