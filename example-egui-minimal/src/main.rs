@@ -47,7 +47,7 @@ struct ExampleApp {
 
 impl ::eframe::App for ExampleApp {
     fn ui(&mut self, ui: &mut ::egui::Ui, _frame: &mut ::eframe::Frame) {
-        CentralPanel::default().show_inside(ui, |ui| {
+        CentralPanel::default().show(ui, |ui| {
             ui.vertical_centered(|ui| {
                 // Check for state updates for asynchronous task.
                 self.tcping.poll();

@@ -56,7 +56,7 @@ jobs:
               with:
                   # Must be in sync with `$SRC_ROOT/rust-toolchain.toml`.
                   # Must be in sync with `$SRC_ROOT/ci/container/base/Containerfile`.
-                  toolchain: 1.93.1
+                  toolchain: 1.95.0
                   components: clippy
 
             - name: Install just
@@ -86,7 +86,7 @@ jobs:
               with:
                   # Must be in sync with `$SRC_ROOT/rust-toolchain.toml`.
                   # Must be in sync with `$SRC_ROOT/ci/container/base/Containerfile`.
-                  toolchain: 1.93.1
+                  toolchain: 1.95.0
                   components: clippy,rust-analyzer,rust-src
 
             - name: Install just

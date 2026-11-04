@@ -484,7 +484,7 @@ impl Plugin for EguiAsyncPlugin {
         }
     }
 
-    fn input_hook(&mut self, input: &mut RawInput) {
+    fn input_hook(&mut self, _ctx: &Context, input: &mut RawInput) {
         let egui_async = self.upgrade();
         let inner = Self::inner(&egui_async.inner);
 
@@ -493,7 +493,7 @@ impl Plugin for EguiAsyncPlugin {
         }
     }
 
-    fn output_hook(&mut self, output: &mut FullOutput) {
+    fn output_hook(&mut self, _ctx: &Context, output: &mut FullOutput) {
         let egui_async = self.upgrade();
         let mut inner = Self::inner_mut(&egui_async.inner);
 
